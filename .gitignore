@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.db
+.env
+
+# Node
+node_modules/
+dist/
+.vite/
+.env.local
+
+# OS/IDE
+.DS_Store
+.vscode/
+
+# Logs
+*.log
+
+# Git safety
+**/.git
