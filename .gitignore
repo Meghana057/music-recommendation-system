@@ -1,21 +1,30 @@
-# Python
+# --- Python (Backend) ---
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 *.db
-.env
-
-# Node
-node_modules/
-dist/
-.vite/
-.env.local
-
-# OS/IDE
-.DS_Store
-.vscode/
-
-# Logs
+*.sqlite3
 *.log
+.env
+.env.*
 
-# Git safety
+# --- Node.js (Frontend) ---
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.js
+frontend/coverage/
+frontend/build/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# --- VS Code / OS ---
+.vscode/
+.DS_Store
+
+# --- Git ---
 **/.git
