@@ -80,6 +80,10 @@ const SongsTable: React.FC<SongsTableProps> = ({
     // This would ideally trigger a refetch or update the local state
     // For now, the StarRating component handles the API call
   }, []);
+  const handleRatingSuccess = useCallback(() => {
+    // Refresh data after successful rating
+    onRefresh();
+  }, [onRefresh]);
 
   const getPopularityLevel = (ratingCount: number): { color: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error', label: string } => {
     if (ratingCount === 0) return { color: 'default', label: 'New' };
@@ -388,6 +392,7 @@ const SongsTable: React.FC<SongsTableProps> = ({
                         averageRating={song.average_rating}
                         ratingCount={song.rating_count}
                         onRatingChange={(newRating) => handleRatingChange(index, newRating)}
+                        onRatingSuccess={handleRatingSuccess}
                         size="small"
                         showAverage={false} // We show it in the popularity column
                       />

@@ -13,6 +13,7 @@ interface StarRatingProps {
   averageRating: number; // Community average rating
   ratingCount: number; // Total number of ratings
   onRatingChange?: (newRating: number) => void;
+  onRatingSuccess?: () => void; // NEW: Simple callback when rating succeeds
   readOnly?: boolean;
   size?: 'small' | 'medium' | 'large';
   showAverage?: boolean;
@@ -25,43 +26,75 @@ const StarRating: React.FC<StarRatingProps> = ({
   averageRating,
   ratingCount,
   onRatingChange,
+  onRatingSuccess, // NEW
   readOnly = false,
   size = 'medium',
   showAverage = true,
 }) => {
   const [hoverRating, setHoverRating] = useState<number>(-1);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false); // NEW: Local loading state
   const { user } = useAuth();
   const { rating, ratingLoading, ratingError } = useRating();
 
   const handleRatingChange = useCallback(async (event: React.SyntheticEvent, newValue: number | null) => {
-    if (readOnly || newValue === null) return;
+    if (readOnly || newValue === null || isUpdating) return;
 
     if (!user) {
-      // Could trigger auth modal here
       alert('Please sign in to rate songs');
       return;
     }
 
-    const success = await rating(songId, newValue);
-    if (success && onRatingChange) {
-      onRatingChange(newValue);
+    setIsUpdating(true);
+    
+    try {
+      const success = await rating(songId, newValue);
+      if (success) {
+        // Immediate callback
+        if (onRatingChange) {
+          onRatingChange(newValue);
+        }
+        
+        // Trigger refresh after a short delay
+        if (onRatingSuccess) {
+          setTimeout(() => {
+            onRatingSuccess();
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating rating:', error);
+    } finally {
+      setIsUpdating(false);
     }
-  }, [songId, rating, onRatingChange, readOnly, user]);
+  }, [songId, rating, onRatingChange, onRatingSuccess, readOnly, user, isUpdating]);
 
   const handleMouseEnter = useCallback((event: React.SyntheticEvent, newValue: number) => {
-    if (!readOnly && user) {
+    if (!readOnly && user && !isUpdating) {
       setHoverRating(newValue);
     }
-  }, [readOnly, user]);
+  }, [readOnly, user, isUpdating]);
 
   const handleMouseLeave = useCallback(() => {
-    if (!readOnly) {
+    if (!readOnly && !isUpdating) {
       setHoverRating(-1);
     }
-  }, [readOnly]);
+  }, [readOnly, isUpdating]);
 
   const displayRating = hoverRating !== -1 ? hoverRating : currentRating;
 
+  // Show updating state
+  if (isUpdating) {
+    return (
+      <Box display="flex" alignItems="center" gap={1}>
+        <CircularProgress size={20} />
+        <Typography variant="body2" color="text.secondary">
+          Updating...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Show loading state from hook
   if (ratingLoading) {
     return (
       <Box display="flex" alignItems="center" gap={1}>
@@ -95,7 +128,7 @@ const StarRating: React.FC<StarRatingProps> = ({
               onChange={handleRatingChange}
               onChangeActive={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
-              readOnly={readOnly || !user}
+              readOnly={readOnly || !user || isUpdating}
               precision={0.5}
               size={size}
               icon={<Star fontSize="inherit" />}
