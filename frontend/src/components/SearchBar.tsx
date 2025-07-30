@@ -25,14 +25,16 @@ import StarRating from './StarRating';
 interface SearchBarProps {
   onSongFound?: (song: any) => void;
   placeholder?: string;
+  onRatingUpdate?: (songId: string, newUserRating: number, newAverage: number, newCount: number) => void; // New prop
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
   onSongFound,
-  placeholder = "Enter song title to search..."
+  placeholder = "Enter song title to search...",
+  onRatingUpdate // New prop
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const { searchResult, searching, searchError, searchSong, clearSearch } = useSearch();
+  const { searchResult, searching, searchError, searchSong, clearSearch, updateSearchResult } = useSearch();
 
   const handleSearch = useCallback(async () => {
     if (searchTerm.trim()) {
@@ -67,18 +69,26 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
   }, [handleSearch]);
 
+  // Updated handleClear to clear both search term AND search results
   const handleClear = useCallback(() => {
-    setSearchTerm('');
-    clearSearch();
+    setSearchTerm(''); // Clear the input field
+    clearSearch();     // Clear the search results
   }, [clearSearch]);
 
   const handleRatingChange = useCallback((newRating: number) => {
-    // Update the search result with new rating
-    if (searchResult) {
-      // The rating update is handled by the StarRating component
-      // This callback can be used for additional UI updates if needed
+    // This is handled by the StarRating component with optimistic updates
+    // The actual update happens in handleRatingSuccess
+  }, []);
+
+  const handleRatingSuccess = useCallback((songId: string, newUserRating: number, newAverage: number, newCount: number) => {
+    // Update the search result optimistically
+    updateSearchResult(songId, newUserRating, newAverage, newCount);
+    
+    // Also update global state (table + analytics)
+    if (onRatingUpdate) {
+      onRatingUpdate(songId, newUserRating, newAverage, newCount);
     }
-  }, [searchResult]);
+  }, [updateSearchResult, onRatingUpdate]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto' }}>
@@ -134,7 +144,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             action={
               <IconButton
                 size="small"
-                onClick={clearSearch}
+                onClick={handleClear}
               >
                 <ClearIcon />
               </IconButton>
@@ -188,13 +198,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
                     averageRating={searchResult.average_rating}
                     ratingCount={searchResult.rating_count}
                     onRatingChange={handleRatingChange}
+                    onRatingSuccess={handleRatingSuccess} // Add optimistic updates
+                    readOnly={false} // Keep rating enabled
                     size="medium"
                   />
                   
                   <Button
                     variant="outlined"
                     size="small"
-                    onClick={clearSearch}
+                    onClick={handleClear} // This will now clear both input and results
                     startIcon={<ClearIcon />}
                   >
                     Clear Result

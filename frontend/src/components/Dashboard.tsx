@@ -117,6 +117,28 @@ const Dashboard: React.FC = () => {
     }
   }, [updateSongRating, handleRefresh, analyticsData, user, updateRatedSongsCount]);
 
+  // New: Global rating update handler for ALL components
+  const handleGlobalRatingUpdate = useCallback((
+    songId: string, 
+    newUserRating: number, 
+    newAverage: number, 
+    newCount: number
+  ) => {
+    // Update main table data
+    if (updateSongRating) {
+      updateSongRating(songId, newUserRating, newAverage, newCount);
+    }
+    
+    // Update analytics data
+    if (analyticsData?.allSongs && user) {
+      const currentSong = analyticsData.allSongs.find(song => song.id === songId);
+      const oldUserRating = currentSong?.user_rating || 0;
+      updateRatedSongsCount(songId, newUserRating, oldUserRating);
+    }
+    
+    // Note: Search results will be updated by SearchBar's own callback
+  }, [updateSongRating, analyticsData, user, updateRatedSongsCount]);
+
   // Generate chart data from ALL songs (not just current page)
   const chartSongs = analyticsData?.allSongs || [];
   const acousticsData = generateAcousticsData(chartSongs);
@@ -269,6 +291,7 @@ const Dashboard: React.FC = () => {
               // Optional: Handle when a song is found
               console.log('Song found:', song);
             }}
+            onRatingUpdate={handleGlobalRatingUpdate} // Pass global rating handler
           />
         </Box>
       </TabPanel>

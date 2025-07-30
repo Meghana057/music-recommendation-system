@@ -10,6 +10,7 @@ interface UseSearchReturn {
   searchError: string | null;
   searchSong: (title: string) => Promise<void>;
   clearSearch: () => void;
+  updateSearchResult: (songId: string, newUserRating: number, newAverage: number, newCount: number) => void;
 }
 
 export const useSearch = (): UseSearchReturn => {
@@ -48,11 +49,27 @@ export const useSearch = (): UseSearchReturn => {
     setSearchError(null);
   }, []);
 
+  // New function to update search result optimistically
+  const updateSearchResult = useCallback((songId: string, newUserRating: number, newAverage: number, newCount: number) => {
+    setSearchResult(prevResult => {
+      if (prevResult && prevResult.id === songId) {
+        return {
+          ...prevResult,
+          user_rating: newUserRating,
+          average_rating: newAverage,
+          rating_count: newCount
+        };
+      }
+      return prevResult;
+    });
+  }, []);
+
   return {
     searchResult,
     searching,
     searchError,
     searchSong,
     clearSearch,
+    updateSearchResult,
   };
 };
