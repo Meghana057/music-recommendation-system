@@ -40,6 +40,7 @@ interface SongsTableProps {
   sortConfig: SortConfig | null;
   onSort: (field: keyof Song) => void;
   onRefresh: () => void;
+  onSongRatingUpdate?: (songId: string, newUserRating: number, newAverage: number, newCount: number) => void;
   onExport: () => void;
   exportLoading?: boolean;
 }
@@ -55,6 +56,7 @@ const SongsTable: React.FC<SongsTableProps> = ({
   sortConfig,
   onSort,
   onRefresh,
+  onSongRatingUpdate,
   onExport,
   exportLoading = false,
 }) => {
@@ -77,13 +79,21 @@ const SongsTable: React.FC<SongsTableProps> = ({
   };
 
   const handleRatingChange = useCallback((songIndex: number, newRating: number) => {
-    // This would ideally trigger a refetch or update the local state
-    // For now, the StarRating component handles the API call
+    // This is handled by the StarRating component's optimistic updates
+    console.log(`Song ${songIndex} rated ${newRating} stars`);
   }, []);
-  const handleRatingSuccess = useCallback(() => {
-    // Refresh data after successful rating
-    onRefresh();
-  }, [onRefresh]);
+  
+  const handleRatingSuccess = useCallback((songId: string, newUserRating: number, newAverage: number, newCount: number) => {
+    // Use optimistic updates if available, otherwise fall back to full refetch
+    if (onSongRatingUpdate) {
+      onSongRatingUpdate(songId, newUserRating, newAverage, newCount);
+    } else {
+      // Fallback to full refresh after a short delay
+      setTimeout(() => {
+        onRefresh();
+      }, 500);
+    }
+  }, [onSongRatingUpdate, onRefresh]);
 
   const getPopularityLevel = (ratingCount: number): { color: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error', label: string } => {
     if (ratingCount === 0) return { color: 'default', label: 'New' };
@@ -388,7 +398,7 @@ const SongsTable: React.FC<SongsTableProps> = ({
                       <StarRating
                         songId={song.id}
                         songTitle={song.title}
-                        currentRating={song.user_rating||0}
+                        currentRating={song.user_rating || 0}
                         averageRating={song.average_rating}
                         ratingCount={song.rating_count}
                         onRatingChange={(newRating) => handleRatingChange(index, newRating)}

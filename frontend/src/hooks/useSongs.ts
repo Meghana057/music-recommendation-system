@@ -1,6 +1,6 @@
 // src/hooks/useSongs.ts
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Song, PaginatedResponse, ApiError, SortConfig } from '../types';
 import { ApiService } from '../services/api';
 import { sortSongs } from '../utils';
@@ -18,6 +18,7 @@ interface UseSongsReturn {
   setPage: (page: number) => void;
   sortConfig: SortConfig | null;
   handleSort: (field: keyof Song) => void;
+  updateSongRating: (songId: string, newUserRating: number, newAverage: number, newCount: number) => void;
 }
 
 export const useSongs = (initialPage: number = 1, limit: number = 10): UseSongsReturn => {
@@ -34,6 +35,13 @@ export const useSongs = (initialPage: number = 1, limit: number = 10): UseSongsR
     has_prev: false,
   });
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  
+  // Store raw data separately from sorted data
+  const [rawSongs, setRawSongs] = useState<Song[]>([]);
+  
+  // Use ref to get current sortConfig without causing useCallback to recreate
+  const sortConfigRef = useRef<SortConfig | null>(null);
+  sortConfigRef.current = sortConfig;
 
   const fetchSongs = useCallback(async (page: number = currentPage) => {
     try {
@@ -42,14 +50,9 @@ export const useSongs = (initialPage: number = 1, limit: number = 10): UseSongsR
       
       const response = await ApiService.getSongs(page, limit);
       
-      let { items } = response;
+      // Store raw data
+      setRawSongs(response.items);
       
-      // Apply client-side sorting if configured
-      if (sortConfig) {
-        items = sortSongs(items, sortConfig.field, sortConfig.direction);
-      }
-      
-      setSongs(items);
       setPaginationData({
         page: response.page,
         limit: response.limit,
@@ -61,11 +64,27 @@ export const useSongs = (initialPage: number = 1, limit: number = 10): UseSongsR
     } catch (err) {
       const apiError = err as ApiError;
       setError(apiError.detail || 'Failed to fetch songs');
+      setRawSongs([]);
       setSongs([]);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, limit, sortConfig]);
+  }, [currentPage, limit]); // Removed sortConfig dependency
+
+  // Separate effect to handle sorting when rawSongs or sortConfig changes
+  useEffect(() => {
+    if (rawSongs.length > 0) {
+      let sortedSongs = [...rawSongs];
+      
+      if (sortConfigRef.current) {
+        sortedSongs = sortSongs(sortedSongs, sortConfigRef.current.field, sortConfigRef.current.direction);
+      }
+      
+      setSongs(sortedSongs);
+    } else {
+      setSongs([]);
+    }
+  }, [rawSongs, sortConfig]);
 
   const setPage = useCallback((page: number) => {
     setCurrentPage(page);
@@ -84,9 +103,28 @@ export const useSongs = (initialPage: number = 1, limit: number = 10): UseSongsR
     });
   }, []);
 
+  // Optimistic update for song ratings
+  const updateSongRating = useCallback((songId: string, newUserRating: number, newAverage: number, newCount: number) => {
+    const updateSongInArray = (songsArray: Song[]) => 
+      songsArray.map(song => 
+        song.id === songId 
+          ? { 
+              ...song, 
+              user_rating: newUserRating,
+              average_rating: newAverage,
+              rating_count: newCount
+            }
+          : song
+      );
+
+    // Update both raw and sorted data
+    setRawSongs(prevRaw => updateSongInArray(prevRaw));
+    setSongs(prevSongs => updateSongInArray(prevSongs));
+  }, []);
+
   const refetch = useCallback(() => fetchSongs(currentPage), [fetchSongs, currentPage]);
 
-  // Fixed useEffect dependency
+  // Initial fetch
   useEffect(() => {
     fetchSongs();
   }, [fetchSongs]);
@@ -104,5 +142,6 @@ export const useSongs = (initialPage: number = 1, limit: number = 10): UseSongsR
     setPage,
     sortConfig,
     handleSort,
+    updateSongRating,
   };
 };

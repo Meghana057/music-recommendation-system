@@ -13,7 +13,7 @@ interface StarRatingProps {
   averageRating: number; // Community average rating
   ratingCount: number; // Total number of ratings
   onRatingChange?: (newRating: number) => void;
-  onRatingSuccess?: () => void; // NEW: Simple callback when rating succeeds
+  onRatingSuccess?: (songId: string, newUserRating: number, newAverage: number, newCount: number) => void; // Enhanced callback
   readOnly?: boolean;
   size?: 'small' | 'medium' | 'large';
   showAverage?: boolean;
@@ -26,15 +26,29 @@ const StarRating: React.FC<StarRatingProps> = ({
   averageRating,
   ratingCount,
   onRatingChange,
-  onRatingSuccess, // NEW
+  onRatingSuccess,
   readOnly = false,
   size = 'medium',
   showAverage = true,
 }) => {
   const [hoverRating, setHoverRating] = useState<number>(-1);
-  const [isUpdating, setIsUpdating] = useState<boolean>(false); // NEW: Local loading state
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const { user } = useAuth();
   const { rating, ratingLoading, ratingError } = useRating();
+
+  const calculateNewAverage = (oldAverage: number, oldCount: number, oldUserRating: number, newUserRating: number) => {
+    if (oldCount === 0) {
+      return newUserRating;
+    }
+    
+    // If user had no previous rating, add to count
+    if (oldUserRating === 0) {
+      return ((oldAverage * oldCount) + newUserRating) / (oldCount + 1);
+    }
+    
+    // If user is updating existing rating
+    return ((oldAverage * oldCount) - oldUserRating + newUserRating) / oldCount;
+  };
 
   const handleRatingChange = useCallback(async (event: React.SyntheticEvent, newValue: number | null) => {
     if (readOnly || newValue === null || isUpdating) return;
@@ -46,27 +60,34 @@ const StarRating: React.FC<StarRatingProps> = ({
 
     setIsUpdating(true);
     
+    // Calculate optimistic updates
+    const wasFirstRating = currentRating === 0;
+    const newCount = wasFirstRating ? ratingCount + 1 : ratingCount;
+    const newAverage = calculateNewAverage(averageRating, ratingCount, currentRating, newValue);
+    
+    // Immediate optimistic update
+    if (onRatingSuccess) {
+      onRatingSuccess(songId, newValue, newAverage, newCount);
+    }
+    
+    if (onRatingChange) {
+      onRatingChange(newValue);
+    }
+    
     try {
       const success = await rating(songId, newValue);
-      if (success) {
-        // Immediate callback
-        if (onRatingChange) {
-          onRatingChange(newValue);
-        }
-        
-        // Trigger refresh after a short delay
-        if (onRatingSuccess) {
-          setTimeout(() => {
-            onRatingSuccess();
-          }, 500);
-        }
+      if (!success) {
+        // If API call failed, we might want to revert the optimistic update
+        // For now, we'll let the error show and the user can try again
+        console.error('Rating API call failed');
       }
     } catch (error) {
       console.error('Error updating rating:', error);
+      // In a production app, you might want to revert the optimistic update here
     } finally {
       setIsUpdating(false);
     }
-  }, [songId, rating, onRatingChange, onRatingSuccess, readOnly, user, isUpdating]);
+  }, [songId, rating, onRatingChange, onRatingSuccess, readOnly, user, isUpdating, currentRating, averageRating, ratingCount]);
 
   const handleMouseEnter = useCallback((event: React.SyntheticEvent, newValue: number) => {
     if (!readOnly && user && !isUpdating) {
@@ -82,29 +103,8 @@ const StarRating: React.FC<StarRatingProps> = ({
 
   const displayRating = hoverRating !== -1 ? hoverRating : currentRating;
 
-  // Show updating state
-  if (isUpdating) {
-    return (
-      <Box display="flex" alignItems="center" gap={1}>
-        <CircularProgress size={20} />
-        <Typography variant="body2" color="text.secondary">
-          Updating...
-        </Typography>
-      </Box>
-    );
-  }
-
-  // Show loading state from hook
-  if (ratingLoading) {
-    return (
-      <Box display="flex" alignItems="center" gap={1}>
-        <CircularProgress size={20} />
-        <Typography variant="body2" color="text.secondary">
-          Updating...
-        </Typography>
-      </Box>
-    );
-  }
+  // Show updating state (but don't block the UI completely)
+  const showLoadingIndicator = isUpdating || ratingLoading;
 
   return (
     <Box display="flex" flexDirection="column" alignItems="flex-start" gap={1}>
@@ -128,7 +128,7 @@ const StarRating: React.FC<StarRatingProps> = ({
               onChange={handleRatingChange}
               onChangeActive={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
-              readOnly={readOnly || !user || isUpdating}
+              readOnly={readOnly || !user}
               precision={0.5}
               size={size}
               icon={<Star fontSize="inherit" />}
@@ -146,9 +146,12 @@ const StarRating: React.FC<StarRatingProps> = ({
                 },
               }}
             />
-            <Typography variant="body2" color="text.secondary" sx={{ minWidth: '2em' }}>
-              {currentRating > 0 ? currentRating.toFixed(1) : user ? '—' : '?'}
-            </Typography>
+            <Box display="flex" alignItems="center" gap={0.5} sx={{ minWidth: '3em' }}>
+              <Typography variant="body2" color="text.secondary">
+                {currentRating > 0 ? currentRating.toFixed(1) : user ? '—' : '?'}
+              </Typography>
+              {showLoadingIndicator && <CircularProgress size={12} />}
+            </Box>
           </Box>
         </Tooltip>
       </Box>

@@ -57,6 +57,7 @@ const Dashboard: React.FC = () => {
     setPage,
     sortConfig,
     handleSort,
+    updateSongRating, // Add this
   } = useSongs(1, 10);
 
   const handleTabChange = useCallback((event: React.SyntheticEvent, newValue: number) => {
@@ -74,6 +75,21 @@ const Dashboard: React.FC = () => {
   const handleExport = useCallback(() => {
     // Export functionality is handled by ExportButton component internally
   }, []);
+
+  // Simple callback that SongsTable can use for optimistic updates
+  const handleSongRatingUpdate = useCallback((
+    songId: string, 
+    newUserRating: number, 
+    newAverage: number, 
+    newCount: number
+  ) => {
+    if (updateSongRating) {
+      updateSongRating(songId, newUserRating, newAverage, newCount);
+    } else {
+      // Fallback to refresh if no optimistic updates
+      setTimeout(handleRefresh, 500);
+    }
+  }, [updateSongRating, handleRefresh]);
 
   // Generate chart data from current songs (for demo purposes)
   // In a real app, you might want to fetch all songs for charts
@@ -199,6 +215,7 @@ const Dashboard: React.FC = () => {
               sortConfig={sortConfig}
               onSort={handleSort}
               onRefresh={handleRefresh}
+              onSongRatingUpdate={handleSongRatingUpdate}
               onExport={handleExport}
             />
           )}
