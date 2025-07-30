@@ -16,6 +16,7 @@ import {
   Search as SearchIcon,
 } from '@mui/icons-material';
 import { useSongs } from '../hooks/useSongs';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { generateAcousticsData, generateTempoData } from '../utils';
 import SongsTable from './SongsTable';
 import SearchBar from './SearchBar';
@@ -23,6 +24,7 @@ import ExportButton from './ExportButton';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 import { ScatterChart, Histogram, BarChart } from './charts';
+import { useAuth } from '../contexts/AuthContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -46,6 +48,9 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other })
 
 const Dashboard: React.FC = () => {
   const [tabValue, setTabValue] = useState<number>(0);
+  const { user } = useAuth();
+  
+  // Main songs data for table
   const {
     songs,
     loading,
@@ -57,8 +62,17 @@ const Dashboard: React.FC = () => {
     setPage,
     sortConfig,
     handleSort,
-    updateSongRating, // Add this
+    updateSongRating,
   } = useSongs(1, 10);
+
+  // Analytics data for charts and stats
+  const {
+    analyticsData,
+    loading: analyticsLoading,
+    error: analyticsError,
+    refetch: refetchAnalytics,
+    updateRatedSongsCount
+  } = useAnalytics();
 
   const handleTabChange = useCallback((event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -70,7 +84,8 @@ const Dashboard: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     refetch();
-  }, [refetch]);
+    refetchAnalytics(); // Also refresh analytics data
+  }, [refetch, refetchAnalytics]);
 
   const handleExport = useCallback(() => {
     // Export functionality is handled by ExportButton component internally
@@ -85,16 +100,27 @@ const Dashboard: React.FC = () => {
   ) => {
     if (updateSongRating) {
       updateSongRating(songId, newUserRating, newAverage, newCount);
+      
+      // Update analytics data optimistically if available
+      if (analyticsData?.allSongs && user) {
+        const currentSong = analyticsData.allSongs.find(song => song.id === songId);
+        const oldUserRating = currentSong?.user_rating || 0;
+        
+        // Update the rated songs count optimistically
+        updateRatedSongsCount(songId, newUserRating, oldUserRating);
+      }
     } else {
       // Fallback to refresh if no optimistic updates
-      setTimeout(handleRefresh, 500);
+      setTimeout(() => {
+        handleRefresh();
+      }, 500);
     }
-  }, [updateSongRating, handleRefresh]);
+  }, [updateSongRating, handleRefresh, analyticsData, user, updateRatedSongsCount]);
 
-  // Generate chart data from current songs (for demo purposes)
-  // In a real app, you might want to fetch all songs for charts
-  const acousticsData = generateAcousticsData(songs);
-  const tempoData = generateTempoData(songs);
+  // Generate chart data from ALL songs (not just current page)
+  const chartSongs = analyticsData?.allSongs || [];
+  const acousticsData = generateAcousticsData(chartSongs);
+  const tempoData = generateTempoData(chartSongs);
 
   if (loading && songs.length === 0) {
     return (
@@ -135,11 +161,16 @@ const Dashboard: React.FC = () => {
               </Typography>
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Typography variant="h6" color="success.main">
-                {songs.filter(song =>  song.user_rating && song.user_rating > 0).length}
-              </Typography>
+              <Box display="flex" alignItems="center" gap={1}>
+                <Typography variant="h6" color="success.main">
+                  {analyticsLoading ? '...' : (analyticsData?.totalRatedSongs || 0)}
+                </Typography>
+                {analyticsLoading && (
+                  <LoadingSpinner size={16} />
+                )}
+              </Box>
               <Typography variant="body2" color="text.secondary">
-                Rated Songs
+                {user ? 'Rated Songs (Total)' : 'Rated Songs (This Page)'}
               </Typography>
             </Grid>
           </Grid>
@@ -252,56 +283,72 @@ const Dashboard: React.FC = () => {
             Visualize patterns and trends in your music collection.
           </Typography>
 
-          <Grid container spacing={4}>
-            {/* Scatter Chart */}
-            <Grid item xs={12} lg={6}>
-              <ScatterChart
-                songs={songs}
-                title="Danceability vs Energy"
-                height={350}
-              />
-            </Grid>
+          {analyticsError ? (
+            <ErrorMessage
+              message={analyticsError}
+              onRetry={refetchAnalytics}
+              retryLabel="Reload Analytics"
+            />
+          ) : analyticsLoading ? (
+            <Box display="flex" justifyContent="center" p={4}>
+              <LoadingSpinner message="Loading analytics data..." />
+            </Box>
+          ) : (
+            <Grid container spacing={4}>
+              {/* Scatter Chart */}
+              <Grid item xs={12} lg={6}>
+                <ScatterChart
+                  songs={chartSongs}
+                  title="Danceability vs Energy"
+                  height={350}
+                />
+              </Grid>
 
-            {/* Duration Histogram */}
-            <Grid item xs={12} lg={6}>
-              <Histogram
-                songs={songs}
-                title="Song Duration Distribution"
-                height={350}
-              />
-            </Grid>
+              {/* Duration Histogram */}
+              <Grid item xs={12} lg={6}>
+                <Histogram
+                  songs={chartSongs}
+                  title="Song Duration Distribution"
+                  height={350}
+                />
+              </Grid>
 
-            {/* Acoustics Bar Chart */}
-            <Grid item xs={12} lg={6}>
-              <BarChart
-                data={acousticsData}
-                title="Acoustics Distribution"
-                xAxisLabel="Acoustics Range"
-                yAxisLabel="Number of Songs"
-                height={350}
-                color="#2196f3"
-              />
-            </Grid>
+              {/* Acoustics Bar Chart */}
+              <Grid item xs={12} lg={6}>
+                <BarChart
+                  data={acousticsData}
+                  title="Acoustics Distribution"
+                  xAxisLabel="Acoustics Range"
+                  yAxisLabel="Number of Songs"
+                  height={350}
+                  color="#2196f3"
+                />
+              </Grid>
 
-            {/* Tempo Bar Chart */}
-            <Grid item xs={12} lg={6}>
-              <BarChart
-                data={tempoData}
-                title="Tempo Distribution"
-                xAxisLabel="Tempo Range (BPM)"
-                yAxisLabel="Number of Songs"
-                height={350}
-                color="#ff9800"
-              />
+              {/* Tempo Bar Chart */}
+              <Grid item xs={12} lg={6}>
+                <BarChart
+                  data={tempoData}
+                  title="Tempo Distribution"
+                  xAxisLabel="Tempo Range (BPM)"
+                  yAxisLabel="Number of Songs"
+                  height={350}
+                  color="#ff9800"
+                />
+              </Grid>
             </Grid>
-          </Grid>
+          )}
 
           {/* Charts Note */}
           <Paper elevation={1} sx={{ p: 3, mt: 4, backgroundColor: 'background.default' }}>
             <Typography variant="body2" color="text.secondary">
-              <strong>Note:</strong> Charts are based on the currently loaded page of songs ({songs.length} songs). 
-              For complete analytics across all {totalSongs} songs, consider implementing server-side aggregation 
-              or loading all data for visualization.
+              <strong>Analytics:</strong> Charts display data from all {chartSongs.length} songs in your collection.
+              {analyticsData && user && (
+                <> You have rated {analyticsData.totalRatedSongs} songs total.</>
+              )}
+              {!user && (
+                <> Sign in to see your personal rating statistics.</>
+              )}
             </Typography>
           </Paper>
         </Box>
