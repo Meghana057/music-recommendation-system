@@ -11,3 +11,8 @@ httpx==0.25.2
 supabase==2.3.0
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.6
+pytest==7.4.3
+pytest-cov==6.2.1
+pytest-mock== 3.14.1
+httpx==0.26.0
+httpx-sse==0.4.0
