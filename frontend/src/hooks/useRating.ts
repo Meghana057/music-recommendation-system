@@ -24,8 +24,15 @@ export const useRating = (): UseRatingReturn => {
       setRatingLoading(true);
       setRatingError(null);
 
-      await ApiService.rateSong(songId, ratingValue);
-      return true;
+      const result = await ApiService.rateSong(songId, ratingValue);
+      
+      // Validate response has required rating field
+      if (result && typeof result === 'object' && 'rating' in result && result.rating !== undefined) {
+        return true;
+      } else {
+        setRatingError('Invalid response from server');
+        return false;
+      }
     } catch (err) {
       const apiError = err as ApiError;
       setRatingError(apiError.detail || 'Failed to rate song');

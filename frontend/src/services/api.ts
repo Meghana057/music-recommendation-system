@@ -24,11 +24,8 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
     };
 
     if (session?.access_token) {
-      console.log('🔑 Sending token:', session.access_token.substring(0, 50) + '...');
       headers['Authorization'] = `Bearer ${session.access_token}`;
-    } else {
-      console.log('❌ No token available');
-    }
+    } 
 
     return headers;
   } catch (error) {
