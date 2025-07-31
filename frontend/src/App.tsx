@@ -72,10 +72,7 @@ const AppContent: React.FC = () => {
     setAuthMode(authMode === 'login' ? 'signup' : 'login');
   };
 
-  const handleForgotPassword = () => {
-    // Implement forgot password logic here
-    console.log('Forgot password clicked');
-  };
+  
 
   // Show loading screen during app initialization
   if (appLoading || authLoading) {
@@ -126,7 +123,6 @@ const AppContent: React.FC = () => {
           {authMode === 'login' ? (
             <LoginForm 
               onToggleMode={handleToggleAuthMode}
-              onForgotPassword={handleForgotPassword}
             />
           ) : (
             <SignUpForm 

@@ -14,23 +14,17 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' >('login');
 
   const handleToggleMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login');
   };
-
-  const handleForgotPassword = () => {
-    setMode('forgot');
-  };
-
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogContent sx={{ p: 0 }}>
         {mode === 'login' && (
           <LoginForm 
             onToggleMode={handleToggleMode}
-            onForgotPassword={handleForgotPassword}
           />
         )}
         {mode === 'signup' && (

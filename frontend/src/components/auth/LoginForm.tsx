@@ -23,10 +23,9 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface LoginFormProps {
   onToggleMode: () => void;
-  onForgotPassword: () => void;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, onForgotPassword }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -135,16 +134,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode, onForgotPassword })
         </Button>
 
         <Box textAlign="center">
-          <Link
-            component="button"
-            type="button"
-            variant="body2"
-            onClick={onForgotPassword}
-            sx={{ mr: 2 }}
-          >
-            Forgot password?
-          </Link>
-
           <Link
             component="button"
             type="button"
