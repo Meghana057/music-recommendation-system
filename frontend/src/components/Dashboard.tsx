@@ -167,33 +167,39 @@ const Dashboard: React.FC = () => {
         <Paper elevation={1} sx={{ p: 2, mt: 2, backgroundColor: 'background.default' }}>
           <Grid container spacing={3}>
             <Grid item xs={12} sm={4}>
-              <Typography variant="h6" color="primary">
-                {totalSongs}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total Songs
-              </Typography>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Typography variant="h6" color="secondary">
-                {totalPages}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total Pages
-              </Typography>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Typography variant="h6" color="success.main">
-                  {analyticsLoading ? '...' : (analyticsData?.totalRatedSongs || 0)}
+              <Box display="flex" flexDirection="column" alignItems="center" textAlign="center">
+                <Typography variant="h6" color="primary" sx={{ fontWeight: 600 }}>
+                  {totalSongs}
                 </Typography>
-                {analyticsLoading && (
-                  <LoadingSpinner size={16} />
-                )}
+                <Typography variant="body2" color="text.secondary">
+                  Total Songs
+                </Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary">
-                {user ? 'Rated Songs (Total)' : 'Rated Songs (This Page)'}
-              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Box display="flex" flexDirection="column" alignItems="center" textAlign="center">
+                <Typography variant="h6" color="secondary" sx={{ fontWeight: 600 }}>
+                  {totalPages}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Total Pages
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Box display="flex" flexDirection="column" alignItems="center" textAlign="center">
+                <Box display="flex" alignItems="center" gap={1} justifyContent="center">
+                  <Typography variant="h6" color="success.main" sx={{ fontWeight: 600 }}>
+                    {analyticsLoading ? '...' : (analyticsData?.totalRatedSongs || 0)}
+                  </Typography>
+                  {analyticsLoading && (
+                    <LoadingSpinner size={16} />
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  {user ? 'Rated Songs (Total)' : 'Rated Songs (This Page)'}
+                </Typography>
+              </Box>
             </Grid>
           </Grid>
         </Paper>
@@ -270,7 +276,7 @@ const Dashboard: React.FC = () => {
               onRefresh={handleRefresh}
               onSongRatingUpdate={handleSongRatingUpdate}
               onExport={handleExport}
-            />
+              />
           )}
         </Box>
       </TabPanel>

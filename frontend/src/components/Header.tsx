@@ -8,7 +8,6 @@ import {
   IconButton,
   Box,
   Tooltip,
-  Chip,
   Button,
   Avatar,
   Menu,
@@ -16,35 +15,27 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  useTheme,
 } from '@mui/material';
 import {
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
   MusicNote as MusicNoteIcon,
-  Refresh as RefreshIcon,
   Login as LoginIcon,
   Logout as LogoutIcon,
-  Person as PersonIcon,
   AccountCircle as AccountCircleIcon,
 } from '@mui/icons-material';
 import { useThemeContext } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
-  totalSongs?: number;
-  onRefresh?: () => void;
-  refreshing?: boolean;
   onOpenAuth?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({
-  totalSongs = 0,
-  onRefresh,
-  refreshing = false,
-  onOpenAuth,
-}) => {
+const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
   const { mode, toggleTheme } = useThemeContext();
   const { user, signOut } = useAuth();
+  const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -64,14 +55,9 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const getUserDisplayName = () => {
-    if (!user) return '';
-    return user.email?.split('@')[0] || 'User';
-  };
-
   const getUserInitials = () => {
     if (!user) return '';
-    const name = getUserDisplayName();
+    const name = user.email?.split('@')[0] || 'User';
     return name.charAt(0).toUpperCase();
   };
 
@@ -84,44 +70,10 @@ const Header: React.FC<HeaderProps> = ({
           <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
             Music Recommendation System
           </Typography>
-          
-          {/* Songs Count Badge */}
-          {totalSongs > 0 && (
-            <Chip
-              label={`${totalSongs} songs`}
-              size="small"
-              color="secondary"
-              sx={{ ml: 2 }}
-            />
-          )}
         </Box>
 
         {/* Action Buttons */}
         <Box display="flex" alignItems="center" gap={1}>
-          {/* Refresh Button */}
-          {onRefresh && (
-            <Tooltip title="Refresh data">
-              <IconButton
-                color="inherit"
-                onClick={onRefresh}
-                disabled={refreshing}
-                sx={{
-                  animation: refreshing ? 'spin 1s linear infinite' : 'none',
-                  '@keyframes spin': {
-                    '0%': {
-                      transform: 'rotate(0deg)',
-                    },
-                    '100%': {
-                      transform: 'rotate(360deg)',
-                    },
-                  },
-                }}
-              >
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          )}
-
           {/* Theme Toggle */}
           <Tooltip title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}>
             <IconButton
@@ -164,11 +116,25 @@ const Header: React.FC<HeaderProps> = ({
                   sx: {
                     mt: 1.5,
                     minWidth: 200,
+                    fontFamily: theme.typography.fontFamily,
                     '& .MuiAvatar-root': {
                       width: 24,
                       height: 24,
                       ml: -0.5,
                       mr: 1,
+                    },
+                    '& .MuiMenuItem-root': {
+                      fontFamily: theme.typography.fontFamily,
+                      fontSize: theme.typography.body2.fontSize,
+                      fontWeight: theme.typography.body2.fontWeight,
+                    },
+                    '& .MuiTypography-root': {
+                      fontFamily: theme.typography.fontFamily,
+                    },
+                    '& .MuiListItemText-primary': {
+                      fontFamily: theme.typography.fontFamily,
+                      fontSize: theme.typography.body2.fontSize,
+                      fontWeight: theme.typography.body2.fontWeight,
                     },
                   },
                 }}
@@ -181,20 +147,18 @@ const Header: React.FC<HeaderProps> = ({
                     <AccountCircleIcon />
                   </ListItemIcon>
                   <ListItemText>
-                    <Typography variant="body2" noWrap>
+                    <Typography 
+                      variant="body2" 
+                      noWrap
+                      sx={{ 
+                        fontFamily: theme.typography.fontFamily,
+                        fontSize: theme.typography.body2.fontSize,
+                        fontWeight: theme.typography.body2.fontWeight
+                      }}
+                    >
                       {user.email}
                     </Typography>
                   </ListItemText>
-                </MenuItem>
-
-                <Divider />
-
-                {/* Profile Option */}
-                <MenuItem onClick={handleUserMenuClose}>
-                  <ListItemIcon>
-                    <PersonIcon />
-                  </ListItemIcon>
-                  <ListItemText>My Profile</ListItemText>
                 </MenuItem>
 
                 <Divider />
@@ -204,7 +168,17 @@ const Header: React.FC<HeaderProps> = ({
                   <ListItemIcon>
                     <LogoutIcon />
                   </ListItemIcon>
-                  <ListItemText>Sign Out</ListItemText>
+                  <ListItemText 
+                    primaryTypographyProps={{
+                      sx: {
+                        fontFamily: theme.typography.fontFamily,
+                        fontSize: theme.typography.body2.fontSize,
+                        fontWeight: theme.typography.body2.fontWeight
+                      }
+                    }}
+                  >
+                    Sign Out
+                  </ListItemText>
                 </MenuItem>
               </Menu>
             </>

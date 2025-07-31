@@ -20,7 +20,6 @@ import {
   TableSortLabel,
 } from '@mui/material';
 import {
-  Download as DownloadIcon,
   Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
@@ -146,16 +145,6 @@ const SongsTable: React.FC<SongsTableProps> = ({
           <Tooltip title="Refresh data">
             <IconButton onClick={onRefresh} disabled={loading}>
               <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          
-          <Tooltip title="Export as CSV">
-            <IconButton 
-              onClick={onExport} 
-              disabled={exportLoading || loading}
-              color="primary"
-            >
-              <DownloadIcon />
             </IconButton>
           </Tooltip>
         </Box>

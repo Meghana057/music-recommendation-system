@@ -15,7 +15,6 @@ import ErrorMessage from './components/ErrorMessage';
 const AppContent: React.FC = () => {
   const [appLoading, setAppLoading] = useState<boolean>(true);
   const [appError, setAppError] = useState<string | null>(null);
-  const [totalSongs, setTotalSongs] = useState<number>(0);
   const [healthStatus, setHealthStatus] = useState<boolean>(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [welcomeMessage, setWelcomeMessage] = useState<string>('');
@@ -32,10 +31,6 @@ const AppContent: React.FC = () => {
         // Check backend health
         await ApiService.healthCheck();
         setHealthStatus(true);
-
-        // Get total songs count
-        const { total_songs } = await ApiService.getSongsCount();
-        setTotalSongs(total_songs);
 
       } catch (error) {
         console.error('App initialization failed:', error);
@@ -114,10 +109,7 @@ const AppContent: React.FC = () => {
       {user ? (
         // Show dashboard for authenticated users
         <>
-          <Header 
-            totalSongs={totalSongs}
-            onRefresh={handleRefresh}
-          />
+          <Header />
           <Box component="main" sx={{ flexGrow: 1 }}>
             <Dashboard />
           </Box>
@@ -176,9 +168,6 @@ const AppContent: React.FC = () => {
 
       await ApiService.healthCheck();
       setHealthStatus(true);
-
-      const { total_songs } = await ApiService.getSongsCount();
-      setTotalSongs(total_songs);
 
     } catch (error) {
       console.error('App initialization failed:', error);
