@@ -9,6 +9,7 @@ import getTheme from '../theme';
 interface ThemeContextType {
   mode: ThemeMode;
   toggleTheme: () => void;
+  resetTheme: () => void; // New function for logout
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -32,6 +33,13 @@ export const ThemeContextProvider: React.FC<ThemeContextProviderProps> = ({ chil
     });
   };
 
+  const resetTheme = () => {
+    // Reset to default theme (light)
+    setMode('light');
+    localStorage.removeItem('theme-mode');
+    console.log('🎨 Theme reset to light mode');
+  };
+
   const theme = getTheme(mode);
 
   useEffect(() => {
@@ -39,9 +47,24 @@ export const ThemeContextProvider: React.FC<ThemeContextProviderProps> = ({ chil
     localStorage.setItem('theme-mode', mode);
   }, [mode]);
 
+  // Listen for logout event to reset theme
+  useEffect(() => {
+    const handleLogout = () => {
+      resetTheme();
+    };
+
+    // Listen for custom logout event
+    window.addEventListener('user-logout', handleLogout);
+    
+    return () => {
+      window.removeEventListener('user-logout', handleLogout);
+    };
+  }, []);
+
   const contextValue: ThemeContextType = {
     mode,
     toggleTheme,
+    resetTheme,
   };
 
   return (

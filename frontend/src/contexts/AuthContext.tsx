@@ -103,16 +103,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      return { error: null };
-    } catch (error) {
-      console.error('Sign out error:', error);
-      return { error: error as AuthError };
-    }
-  };
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    
+    // Trigger theme reset event
+    window.dispatchEvent(new CustomEvent('user-logout'));
+    
+    return { error: null };
+  } catch (error) {
+    console.error('Sign out error:', error);
+    return { error: error as AuthError };
+  }
+};
 
   const getUserProfile = async (): Promise<UserProfile | null> => {
     if (!session?.access_token) return null;
