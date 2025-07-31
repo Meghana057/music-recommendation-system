@@ -155,7 +155,7 @@ def get_songs_with_user_ratings(db: Session, user_id: Optional[str], page: int =
     offset = (page - 1) * limit
     
     # Base query for songs
-    songs_query = db.query(models.Song).offset(offset).limit(limit)
+    songs_query = db.query(models.Song).order_by(models.Song.index).offset(offset).limit(limit)
     songs = songs_query.all()
     total = db.query(models.Song).count()
     
