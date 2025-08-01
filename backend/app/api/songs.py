@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
 from app.auth import get_current_user, get_current_user_optional, User
+from app.recommendation_engine import recommendation_engine  # NEW IMPORT
 from typing import Optional, List
 import math
 
@@ -106,6 +107,37 @@ def get_user_profile(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "created_at": current_user.created_at
     }
+
+
+# NEW RECOMMENDATIONS ENDPOINT
+@router.get("/recommendations", response_model=schemas.RecommendationsResponse)
+def get_recommendations(
+    limit: int = Query(10, ge=1, le=20, description="Number of recommendations to return"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get personalized music recommendations based on user's rating history
+    
+    - **limit**: Number of recommendations to return (1-20)
+    
+    Requires authentication. Analyzes user's highly-rated songs to find similar unrated songs.
+    """
+    try:
+        result = recommendation_engine.get_user_recommendations(db, current_user.id, limit)
+        
+        return schemas.RecommendationsResponse(
+            recommendations=result['recommendations'],
+            total_user_ratings=result['total_user_ratings'],
+            taste_profile=result['taste_profile'],
+            message=result['message']
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to generate recommendations: {str(e)}"
+        )
 
 
 @router.get("/stats/count")

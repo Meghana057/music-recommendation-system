@@ -1,3 +1,4 @@
+# defines SQLAlchemy DB models (i.e., how the DB table is structured)
 from sqlalchemy import Column, Integer, String, Float, BigInteger, DateTime, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship

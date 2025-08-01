@@ -1,3 +1,4 @@
+#SQLAlchemy DB interaction functions
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app import models, schemas

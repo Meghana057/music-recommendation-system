@@ -14,6 +14,7 @@ import {
   TableChart as TableIcon,
   BarChart as ChartIcon,
   Search as SearchIcon,
+  Recommend as RecommendIcon,
 } from '@mui/icons-material';
 import { useSongs } from '../hooks/useSongs';
 import { useAnalytics } from '../hooks/useAnalytics';
@@ -25,6 +26,7 @@ import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 import { ScatterChart, Histogram, BarChart } from './charts';
 import { useAuth } from '../contexts/AuthContext';
+import MusicRecommendations from './MusicRecommendations';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -197,7 +199,7 @@ const Dashboard: React.FC = () => {
                   )}
                 </Box>
                 <Typography variant="body2" color="text.secondary">
-                  {user ? 'Rated Songs (Total)' : 'Rated Songs (This Page)'}
+                  {user ? 'Rated Songs' : 'Rated Songs (This Page)'}
                 </Typography>
               </Box>
             </Grid>
@@ -236,11 +238,18 @@ const Dashboard: React.FC = () => {
             aria-controls="dashboard-tabpanel-1"
           />
           <Tab
-            icon={<ChartIcon />}
-            label="Analytics"
+            icon={<RecommendIcon />}
+            label="Recommendations"
             iconPosition="start"
             id="dashboard-tab-2"
             aria-controls="dashboard-tabpanel-2"
+          />
+          <Tab
+            icon={<ChartIcon />}
+            label="Analytics"
+            iconPosition="start"
+            id="dashboard-tab-3"
+            aria-controls="dashboard-tabpanel-3"
           />
         </Tabs>
       </Paper>
@@ -301,8 +310,10 @@ const Dashboard: React.FC = () => {
           />
         </Box>
       </TabPanel>
-
-      <TabPanel value={tabValue} index={2}>
+       <TabPanel value={tabValue} index={2}>
+          <MusicRecommendations />
+      </TabPanel>
+      <TabPanel value={tabValue} index={3}>
         {/* Analytics Tab */}
         <Box>
           <Typography variant="h5" fontWeight="600" gutterBottom>

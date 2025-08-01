@@ -1,3 +1,4 @@
+#boots the FastAPI app
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import songs

@@ -2,7 +2,7 @@
 
 import axios, { AxiosResponse } from 'axios';
 import { supabase } from '../config/supabase';
-import { Song, PaginatedResponse, SearchResponse, RatingRequest, ApiError, UserProfile, UserRating } from '../types';
+import { Song, PaginatedResponse, SearchResponse, RatingRequest, ApiError, UserProfile, UserRating, RecommendationsResponse } from '../types';
 import { API_BASE_URL, HEALTH_CHECK_URL } from '../config/constants';
 
 const apiClient = axios.create({
@@ -139,6 +139,20 @@ export class ApiService {
   static async getUserProfile(): Promise<UserProfile> {
     try {
       const response = await apiClient.get<UserProfile>('/songs/user/profile');
+      return response.data;
+    } catch (error) {
+      throw new Error((error as any)?.detail || 'API error');
+    }
+  }
+
+  /**
+   * NEW: Get personalized music recommendations (requires authentication)
+   */
+  static async getRecommendations(limit: number = 10): Promise<RecommendationsResponse> {
+    try {
+      const response = await apiClient.get<RecommendationsResponse>('/songs/recommendations', {
+        params: { limit },
+      });
       return response.data;
     } catch (error) {
       throw new Error((error as any)?.detail || 'API error');

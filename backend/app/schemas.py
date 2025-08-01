@@ -112,3 +112,27 @@ class User(BaseModel):
     id: str
     email: str
     created_at: str
+
+
+#SCHEMAS FOR MUSIC RECOMMENDATIONS:
+
+class SongRecommendation(SongBase):
+    """Song recommendation with match score and reasoning"""
+    index: int
+    average_rating: float = Field(..., ge=0.0, le=5.0, description="Average rating from all users")
+    rating_count: int = Field(..., ge=0, description="Number of user ratings")
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    match_score: int = Field(..., ge=0, le=100, description="Match percentage (0-100)")
+    reason: str = Field(..., description="Why this song was recommended")
+
+    class Config:
+        from_attributes = True
+
+
+class RecommendationsResponse(BaseModel):
+    """Response for music recommendations"""
+    recommendations: List[SongRecommendation]
+    total_user_ratings: int = Field(..., description="Number of songs the user has rated")
+    taste_profile: Optional[str] = Field(None, description="AI-generated description of user's music taste")
+    message: str = Field(..., description="Explanation message")

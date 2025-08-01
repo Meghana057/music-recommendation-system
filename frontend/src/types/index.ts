@@ -123,3 +123,17 @@ export interface UserRating {
   created_at: string;
   updated_at: string;
 }
+
+// TYPES FOR MUSIC RECOMMENDATIONS:
+
+export interface SongRecommendation extends Song {
+  match_score: number; // 0-100 percentage match
+  reason: string; // Why this song was recommended
+}
+
+export interface RecommendationsResponse {
+  recommendations: SongRecommendation[];
+  total_user_ratings: number;
+  taste_profile: string | null;
+  message: string;
+}
