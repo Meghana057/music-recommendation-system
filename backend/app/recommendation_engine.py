@@ -86,7 +86,7 @@ class SmartRecommendationEngine:
                 'recommendations': recommendations,
                 'total_user_ratings': len(user_ratings),
                 'taste_profile': taste_profile.get('description', 'Music enthusiast'),
-                'message': f'🎯 Found {len(recommendations)} AI-powered recommendations in {elapsed:.1f}s!'
+                'message':''
             }
             
         except Exception as e:

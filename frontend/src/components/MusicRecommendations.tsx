@@ -178,12 +178,6 @@ const MusicRecommendations: React.FC = () => {
             </Tooltip>
           </Box>
 
-          {message && (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              {message}
-            </Alert>
-          )}
-
           <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
             <MusicNoteIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
             <Typography variant="h6" gutterBottom>
@@ -230,11 +224,7 @@ const MusicRecommendations: React.FC = () => {
             </Tooltip>
           </Box>
 
-          {message && (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              {message}
-            </Alert>
-          )}
+          
 
           <Grid container spacing={3}>
             {recommendations.map((song) => (
