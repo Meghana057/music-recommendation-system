@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
 from app.auth import get_current_user, get_current_user_optional, User
-from app.recommendation_engine import recommendation_engine  # NEW IMPORT
+from app.recommendation_engine import recommendation_engine
 from typing import Optional, List
 import math
 
