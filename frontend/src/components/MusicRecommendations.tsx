@@ -45,7 +45,7 @@ const MusicRecommendations: React.FC = () => {
     setState('loading');
     
     try {
-      const response: RecommendationsResponse = await ApiService.getRecommendations(12);
+      const response: RecommendationsResponse = await ApiService.getRecommendations(6);
       
       setRecommendations(response.recommendations);
       setMessage(response.message);
