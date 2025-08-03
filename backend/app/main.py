@@ -22,7 +22,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
-    allow_credentials=True,
+    allow_credentials=True, #Allow cookies, session tokens, or Authorization headers to be sent with requests.needed Supabase auth (JWT or cookies)
     allow_methods=["*"],
     allow_headers=["*"],  # Important for Authorization header
 )
@@ -30,7 +30,7 @@ app.add_middleware(
 # Create database tables on startup
 @app.on_event("startup")
 def startup_event():
-    """Create database tables when the application starts"""
+    """Create database tables when the application starts (if they don’t already exist)"""
     create_tables()
 
 
@@ -81,12 +81,16 @@ def api_info():
         "database": "PostgreSQL (Supabase)",
         "endpoints": {
             "songs": f"{api_v1_prefix}/songs",
+            "test": f"{api_v1_prefix}/songs/test-simple",
             "search": f"{api_v1_prefix}/songs/search/{{title}}",
             "rate": f"{api_v1_prefix}/songs/{{song_id}}/rate",
+            "song_by_id": f"{api_v1_prefix}/songs/{{song_id}}",
             "song_stats": f"{api_v1_prefix}/songs/{{song_id}}/stats",
             "user_ratings": f"{api_v1_prefix}/songs/user/ratings",
             "user_profile": f"{api_v1_prefix}/songs/user/profile",
+            "recommendations": f"{api_v1_prefix}/songs/recommendations",
             "songs_count": f"{api_v1_prefix}/songs/stats/count"
+            
         },
         "features": [
             "User authentication via Supabase",
@@ -111,6 +115,9 @@ def api_info():
                 "GET /songs/",
                 "GET /songs/{song_id}",
                 "GET /songs/search/{title}"
+                "GET /songs/recommendations",
+                "GET /songs/stats/count",
+                "GET /songs/{song_id}/stats"
             ]
         }
     }

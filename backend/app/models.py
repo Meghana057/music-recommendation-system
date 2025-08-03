@@ -28,10 +28,9 @@ class Song(Base):
     num_segments = Column(Integer, nullable=False)
     class_label = Column(Integer, nullable=False)  # 'class' is a reserved keyword
     
-    # Rating fields
-    # rating = Column(Float, default=0.0)  # Keep for backward compatibility
-    average_rating = Column(Float, default=0.0)  # Average of all user ratings
-    rating_count = Column(Integer, default=0)    # Number of ratings
+    # Rating fields - BUILT IN FROM THE START
+    average_rating = Column(Float, default=0.0, nullable=False)  # Average of all user ratings
+    rating_count = Column(Integer, default=0, nullable=False)    # Number of ratings
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

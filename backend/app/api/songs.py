@@ -91,7 +91,7 @@ def get_user_ratings(
     db: Session = Depends(get_db)
 ):
     """
-    Get all ratings by the current authenticated user
+    Returns all the songs rated by the currently logged-in user.
     """
     ratings = crud.get_user_ratings(db, current_user.id)
     return ratings

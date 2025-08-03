@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class SmartRecommendationEngine:
     def __init__(self):
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        # In-memory cache for taste profiles (use Redis in production)
+        # In-memory cache for taste profiles (use Redis in production) to avoid repeated OpenAI calls
         self.taste_cache = {}
         self.cache_duration = timedelta(hours=24)  # Cache for 24 hours
         
@@ -133,7 +133,7 @@ class SmartRecommendationEngine:
     
     def _get_cached_taste_profile(self, user_id: str, user_ratings: List[Dict]) -> Dict:
         """Get AI taste profile with smart caching"""
-        # Create cache key based on user ratings
+        # Create cache key based on user ratings. To avoid calling a potentially expensive AI function (like a GPT API) if the user’s highly-rated songs haven’t changed.
         ratings_hash = hashlib.md5(
             json.dumps([f"{r['song_id']}:{r['rating']}" for r in user_ratings], sort_keys=True).encode()
         ).hexdigest() 

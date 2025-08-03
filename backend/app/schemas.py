@@ -54,7 +54,7 @@ class SongWithUserRating(SongBase):
         from_attributes = True
 
 
-class SongRating(BaseModel):
+class SongRating(BaseModel):        #Used to receive rating input from the user (typically a POST body for /rate)
     rating: float = Field(..., ge=0.0, le=5.0, description="Song rating (0-5 stars)")
 
     @validator('rating')
@@ -67,12 +67,12 @@ class SongRating(BaseModel):
         return round(float(v), 1)
 
 
-class UserSongRatingCreate(BaseModel):
+class UserSongRatingCreate(BaseModel):      # Schema for creating or updating a rating entry (e.g. inside /rate POST).
     song_id: str = Field(..., min_length=1, description="Song ID")
     rating: float = Field(..., ge=0.0, le=5.0, description="Rating (0-5 stars)")
 
 
-class UserSongRatingResponse(BaseModel):
+class UserSongRatingResponse(BaseModel):        #Schema for returning a rating record back to the user (after rating submission or fetching their ratings). GET
     id: int
     user_id: str
     song_id: str

@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 import math
 
 
-def create_song(db: Session, song: schemas.SongCreate) -> models.Song:
+def create_song(db: Session, song: schemas.SongCreate) -> models.Song:  
     """Create a new song in the database"""
     db_song = models.Song(**song.model_dump())
     db.add(db_song)
@@ -36,7 +36,7 @@ def get_songs(
     Get paginated list of songs
     Returns: (songs_list, total_count)
     """
-    # Calculate offset
+    # Calculate offset/ how many rows to skip
     offset = (page - 1) * limit
     
     # Get total count

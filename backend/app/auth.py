@@ -12,7 +12,7 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 
 # Security scheme
-security = HTTPBearer()
+security = HTTPBearer()             #for extracting the token from the Authorization header
 
 class User(BaseModel):
     id: str
