@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { User as SupabaseUser, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../config/supabase';
 import { AuthState, UserProfile } from '../types';
+import { API_BASE_URL } from '../config/constants';
 
 interface AuthContextType extends AuthState {
   signUp: (email: string, password: string) => Promise<{ user: SupabaseUser | null; error: AuthError | null }>;
@@ -121,7 +122,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!session?.access_token) return null;
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/songs/user/profile', {
+      const response = await fetch(`${API_BASE_URL}/songs/user/profile`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',

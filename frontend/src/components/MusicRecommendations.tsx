@@ -1,4 +1,4 @@
-// src/components/MusicRecommendations.tsx - STABLE VERSION
+// src/components/MusicRecommendations.tsx - WITH TASTE PROFILE
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -29,6 +29,7 @@ type ComponentState = 'loading' | 'no-user' | 'error' | 'no-data' | 'success';
 const MusicRecommendations: React.FC = () => {
   const [state, setState] = useState<ComponentState>('loading');
   const [recommendations, setRecommendations] = useState<SongRecommendation[]>([]);
+  const [tasteProfile, setTasteProfile] = useState<string>(''); // Added for taste profile
   const [error, setError] = useState<string>('');
   const [message, setMessage] = useState<string>('');
   const { user, loading: authLoading } = useAuth();
@@ -48,6 +49,7 @@ const MusicRecommendations: React.FC = () => {
       const response: RecommendationsResponse = await ApiService.getRecommendations(6);
       
       setRecommendations(response.recommendations);
+      setTasteProfile(response.taste_profile || ''); // Capture taste profile
       setMessage(response.message);
       
       // Set final state based on results
@@ -213,7 +215,7 @@ const MusicRecommendations: React.FC = () => {
                 Music Recommendations
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                AI-powered suggestions based on your ratings
+                {tasteProfile ? `Your taste in music: ${tasteProfile}` : 'Discovering your music preferences...'}
               </Typography>
             </Box>
             
@@ -223,8 +225,6 @@ const MusicRecommendations: React.FC = () => {
               </IconButton>
             </Tooltip>
           </Box>
-
-          
 
           <Grid container spacing={3}>
             {recommendations.map((song) => (
@@ -252,20 +252,6 @@ const MusicRecommendations: React.FC = () => {
                         variant="filled"
                       />
                     </Box>
-
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary" 
-                      sx={{ 
-                        fontStyle: 'italic',
-                        mb: 2,
-                        backgroundColor: 'action.hover',
-                        p: 1,
-                        borderRadius: 1,
-                      }}
-                    >
-                      {song.reason}
-                    </Typography>
 
                     <Box display="flex" flexWrap="wrap" gap={1} mb={2}>
                       <Chip

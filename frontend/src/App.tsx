@@ -23,31 +23,11 @@ const AppContent: React.FC = () => {
 
   // Initialize app and check backend health
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        setAppLoading(true);
-        setAppError(null);
-
-        // Check backend health
-        await ApiService.healthCheck();
-        setHealthStatus(true);
-
-      } catch (error) {
-        console.error('App initialization failed:', error);
-        setAppError(
-          'Unable to connect to the backend server. Please ensure the backend is running on http://localhost:8000'
-        );
-        setHealthStatus(false);
-      } finally {
-        setAppLoading(false);
-      }
-    };
-
-    // Only initialize once auth is loaded
     if (!authLoading) {
-      initializeApp();
+      initializeApp();  
     }
   }, [authLoading]);
+
 
   // Show welcome message when user signs in
   useEffect(() => {

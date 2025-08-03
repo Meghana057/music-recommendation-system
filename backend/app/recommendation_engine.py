@@ -1,119 +1,80 @@
-# backend/app/recommendation_engine.py - SMART AI + ML VERSION
+# backend/app/recommendation_engine.py - FINAL OPTIMIZED VERSION
 
 import openai
 import os
 import numpy as np
-from typing import List, Dict, Optional, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, not_, func
-import logging
-import json
-from statistics import mean
-from datetime import datetime, timedelta
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import StandardScaler
-import pickle
 import hashlib
+import json
+from typing import List, Dict, Tuple
+from sqlalchemy.orm import Session
+from sqlalchemy import not_, func
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.tree import DecisionTreeClassifier
+from statistics import mean
 from app.models import Song, UserSongRating
 
-logger = logging.getLogger(__name__)
-
-class SmartRecommendationEngine:
+class MLRecommendationEngine:
     def __init__(self):
-        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        # In-memory cache for taste profiles (use Redis in production) to avoid repeated OpenAI calls
-        self.taste_cache = {}
-        self.cache_duration = timedelta(hours=24)  # Cache for 24 hours
+        # Initialize OpenAI client if available
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if openai_key:
+            self.client = openai.OpenAI(api_key=openai_key)
+            self.openai_available = True
+        else:
+            self.client = None
+            self.openai_available = False
         
-        # Feature weights for similarity calculation
-        self.feature_weights = {
-            'energy': 0.25,
-            'valence': 0.25, 
-            'danceability': 0.20,
-            'acousticness': 0.15,
-            'tempo': 0.10,
-            'loudness': 0.05
-        }
+        self.decision_tree = None
+        self.taste_descriptions = {}  # Simple cache for descriptions
     
     def get_user_recommendations(self, db: Session, user_id: str, limit: int = 10) -> Dict:
-        """
-        Get smart AI + ML powered recommendations
-        """
-        start_time = datetime.now()
+        """Get ML-powered recommendations"""
         
-        try:
-            # 1. Get user's rating history (4+ stars for quality data)
-            user_ratings = self._get_user_ratings(db, user_id)
-            
-            print(f"🎵 Found {len(user_ratings)} highly-rated songs for user {user_id}")
-            
-            if len(user_ratings) < 2:
-                # Not enough data - return diverse popular songs
-                recommendations = self._get_smart_popular_songs(db, limit)
-                return {
-                    'recommendations': recommendations,
-                    'total_user_ratings': len(user_ratings),
-                    'taste_profile': None,
-                    'message': f'Need more ratings! Rate 3+ songs (4-5 stars) to get AI-powered recommendations.'
-                }
-            
-            # 2. Get or generate AI taste profile (with caching)
-            taste_profile = self._get_cached_taste_profile(user_id, user_ratings)
-            
-            # 3. Get candidate songs for recommendation
-            candidates = self._get_recommendation_candidates(db, user_id, limit * 4)  # Get 4x candidates
-            
-            if len(candidates) < limit:
-                # Not enough candidates - supplement with popular songs
-                popular_songs = self._get_smart_popular_songs(db, limit - len(candidates))
-                candidates.extend(popular_songs)
-            
-            print(f"🔍 Analyzing {len(candidates)} candidate songs")
-            
-            # 4. Smart ML-based scoring
-            scored_recommendations = self._score_candidates_ml(candidates, taste_profile, user_ratings)
-            
-            # 5. Apply diversity and quality filters
-            final_recommendations = self._apply_smart_filters(scored_recommendations, limit)
-            
-            # 6. Convert to response format
-            recommendations = self._format_recommendations(final_recommendations)
-            
-            elapsed = (datetime.now() - start_time).total_seconds()
-            print(f"⚡ Generated {len(recommendations)} recommendations in {elapsed:.2f}s")
-            
+        # 1. Get user's rating data
+        user_ratings = self._get_user_ratings(db, user_id)
+        
+        if len(user_ratings) < 3:
             return {
-                'recommendations': recommendations,
+                'recommendations': [],
                 'total_user_ratings': len(user_ratings),
-                'taste_profile': taste_profile.get('description', 'Music enthusiast'),
-                'message':''
+                'taste_profile': 'Rate some songs to get started!',
+                'message': 'Rate 3+ songs (4-5 stars) to get personalized recommendations'
             }
-            
-        except Exception as e:
-            logger.error(f"Smart recommendation error for user {user_id}: {str(e)}")
-            print(f"❌ ERROR: {str(e)}")
-            
-            # Fallback to basic popular songs
-            recommendations = self._get_smart_popular_songs(db, limit)
-            return {
-                'recommendations': recommendations,
-                'total_user_ratings': 0,
-                'taste_profile': None,
-                'message': 'AI temporarily unavailable. Showing quality popular songs.'
-            }
+        
+        # 2. Train decision tree + cosine profile
+        user_profile = self._train_user_model(user_ratings)
+        
+        # 3. Get unrated songs and score them
+        candidates = self._get_unrated_songs(db, user_id)
+        scored_songs = self._score_songs(candidates, user_profile)
+        
+        # 4. Apply diversity filter and get top recommendations
+        final_recommendations = self._apply_diversity_filter(scored_songs, limit)
+        
+        # 5. Generate taste description (cached)
+        taste_description = self._get_taste_description(user_ratings)
+        
+        # 6. Format response
+        recommendations = self._format_recommendations(final_recommendations)
+        
+        return {
+            'recommendations': recommendations,
+            'total_user_ratings': len(user_ratings),
+            'taste_profile': taste_description,
+            'message': f'Based on {len(user_ratings)} rated songs'
+        }
     
     def _get_user_ratings(self, db: Session, user_id: str) -> List[Dict]:
-        """Get user's highly-rated songs for taste analysis"""
+        """Get user ratings for ML training"""
         ratings = db.query(UserSongRating, Song).join(
             Song, UserSongRating.song_id == Song.id
         ).filter(
-            UserSongRating.user_id == user_id,
-            UserSongRating.rating >= 4.0  # Only high-quality ratings
-        ).order_by(UserSongRating.rating.desc()).limit(25).all()
+            UserSongRating.user_id == user_id
+        ).all()
         
-        user_ratings = []
+        user_data = []
         for rating, song in ratings:
-            user_ratings.append({
+            user_data.append({
                 'song_id': song.id,
                 'title': song.title,
                 'rating': rating.rating,
@@ -121,382 +82,234 @@ class SmartRecommendationEngine:
                 'valence': song.valence,
                 'danceability': song.danceability,
                 'acousticness': song.acousticness,
-                'tempo': song.tempo / 200.0,  # Normalize tempo to 0-1 range
-                'loudness': (song.loudness + 30) / 30.0,  # Normalize loudness to 0-1 range
+                'tempo': song.tempo / 200.0,
                 'instrumentalness': song.instrumentalness,
-                'liveness': song.liveness,
-                'key': song.key,
-                'mode': song.mode
+                'liked': 1 if rating.rating >= 4.0 else 0
             })
         
-        return user_ratings
+        return user_data
     
-    def _get_cached_taste_profile(self, user_id: str, user_ratings: List[Dict]) -> Dict:
-        """Get AI taste profile with smart caching"""
-        # Create cache key based on user ratings. To avoid calling a potentially expensive AI function (like a GPT API) if the user’s highly-rated songs haven’t changed.
-        ratings_hash = hashlib.md5(
-            json.dumps([f"{r['song_id']}:{r['rating']}" for r in user_ratings], sort_keys=True).encode()
-        ).hexdigest() 
+    def _train_user_model(self, user_ratings: List[Dict]) -> Dict:
+        """Train decision tree + calculate cosine profile"""
+        liked_songs = [r for r in user_ratings if r['liked'] == 1]
         
-        cache_key = f"{user_id}_{ratings_hash}"
+        # Calculate cosine similarity profile
+        cosine_profile = self._calculate_cosine_profile(liked_songs)
         
-        # Check cache first
-        if cache_key in self.taste_cache:
-            cached_profile, timestamp = self.taste_cache[cache_key]
-            if datetime.now() - timestamp < self.cache_duration:
-                print("📋 Using cached taste profile")
-                return cached_profile
-        
-        # Generate new AI profile
-        print("🧠 Generating AI taste profile...")
-        taste_profile = self._analyze_taste_with_ai(user_ratings)
-        
-        # Cache the result
-        self.taste_cache[cache_key] = (taste_profile, datetime.now())
-        
-        return taste_profile
-    
-    def _analyze_taste_with_ai(self, user_ratings: List[Dict]) -> Dict:
-        """Use OpenAI to analyze user's music taste"""
-        try:
-            # Calculate user's average preferences
-            avg_features = {
-                'energy': mean([r['energy'] for r in user_ratings]),
-                'valence': mean([r['valence'] for r in user_ratings]),
-                'danceability': mean([r['danceability'] for r in user_ratings]),
-                'acousticness': mean([r['acousticness'] for r in user_ratings]),
-                'tempo': mean([r['tempo'] for r in user_ratings]) * 200,  # Denormalize for AI
-                'instrumentalness': mean([r['instrumentalness'] for r in user_ratings]),
-            }
-            
-            # Get top-rated songs for context
-            top_songs = [r['title'] for r in sorted(user_ratings, key=lambda x: x['rating'], reverse=True)[:8]]
-            
-            prompt = f"""Analyze this user's music taste based on their top-rated songs:
-
-Favorite Songs: {', '.join(top_songs)}
-
-Audio Feature Analysis:
-- Energy: {avg_features['energy']:.3f} (0=calm, 1=intense)
-- Valence: {avg_features['valence']:.3f} (0=sad, 1=happy)
-- Danceability: {avg_features['danceability']:.3f} (0=not danceable, 1=very danceable)
-- Acousticness: {avg_features['acousticness']:.3f} (0=electronic, 1=acoustic)
-- Tempo: {avg_features['tempo']:.0f} BPM
-- Instrumentalness: {avg_features['instrumentalness']:.3f} (0=vocal, 1=instrumental)
-
-Create a detailed music taste profile. Return ONLY valid JSON:
-{{
-  "description": "Brief, engaging description of user's taste",
-  "preferred_ranges": {{
-    "energy": [min, max],
-    "valence": [min, max],
-    "danceability": [min, max],
-    "acousticness": [min, max],
-    "tempo": [min, max],
-    "instrumentalness": [min, max]
-  }},
-  "style_keywords": ["keyword1", "keyword2", "keyword3"],
-  "avoid_features": {{
-    "energy": [avoid_min, avoid_max],
-    "valence": [avoid_min, avoid_max]
-  }}
-}}"""
-
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are an expert music analyst. Generate precise taste profiles and return only valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=500,
-                temperature=0.3
-            )
-            
-            profile = json.loads(response.choices[0].message.content.strip())
-            print(f"🎯 AI Profile: {profile['description']}")
-            
-            return profile
-            
-        except Exception as e:
-            print(f"⚠️ AI analysis failed: {e}, using mathematical fallback")
-            return self._generate_mathematical_profile(user_ratings)
-    
-    def _generate_mathematical_profile(self, user_ratings: List[Dict]) -> Dict:
-        """Fallback: Generate taste profile using statistics"""
-        if not user_ratings:
-            return {"description": "Music explorer", "preferred_ranges": {}}
-        
-        # Calculate statistical preferences
-        features = ['energy', 'valence', 'danceability', 'acousticness', 'tempo', 'instrumentalness']
-        preferred_ranges = {}
-        
-        for feature in features:
-            values = [r[feature] for r in user_ratings]
-            mean_val = mean(values)
-            std_val = np.std(values) if len(values) > 1 else 0.2
-            
-            # Create preference range (mean ± 1 std dev, clamped to [0,1])
-            min_val = max(0, mean_val - std_val)
-            max_val = min(1, mean_val + std_val)
-            preferred_ranges[feature] = [min_val, max_val]
-        
-        # Generate description based on features
-        avg_energy = mean([r['energy'] for r in user_ratings])
-        avg_valence = mean([r['valence'] for r in user_ratings])
-        avg_dance = mean([r['danceability'] for r in user_ratings])
-        
-        style_parts = []
-        if avg_energy > 0.7: style_parts.append("high-energy")
-        elif avg_energy < 0.3: style_parts.append("chill")
-        
-        if avg_valence > 0.7: style_parts.append("upbeat")
-        elif avg_valence < 0.3: style_parts.append("emotional")
-        
-        if avg_dance > 0.7: style_parts.append("danceable")
-        
-        description = f"Enjoys {' '.join(style_parts)} music" if style_parts else "Diverse music taste"
+        # Train decision tree if enough data
+        if len(user_ratings) >= 5:
+            try:
+                features = [[r['energy'], r['valence'], r['danceability'], 
+                           r['acousticness'], r['tempo'], r['instrumentalness']] 
+                          for r in user_ratings]
+                labels = [r['liked'] for r in user_ratings]
+                
+                dt = DecisionTreeClassifier(max_depth=4, min_samples_split=3, random_state=42)
+                dt.fit(features, labels)
+                self.decision_tree = dt
+                
+                return {
+                    'method': 'decision_tree',
+                    'tree_model': dt,
+                    'cosine_profile': cosine_profile
+                }
+            except:
+                pass
         
         return {
-            "description": description,
-            "preferred_ranges": preferred_ranges,
-            "style_keywords": style_parts,
-            "avoid_features": {}
+            'method': 'simple',
+            'cosine_profile': cosine_profile
         }
     
-    def _get_recommendation_candidates(self, db: Session, user_id: str, limit: int) -> List[Song]:
-        """Get smart candidate songs for recommendation"""
-        # Get songs user hasn't rated
-        rated_song_ids = db.query(UserSongRating.song_id).filter(
-            UserSongRating.user_id == user_id
-        ).subquery()
-        
-        # Smart filtering: Get diverse candidates across different audio features
-        candidates = db.query(Song).filter(
-            not_(Song.id.in_(rated_song_ids))
-        ).order_by(
-            func.random()  # Randomize to avoid always getting same songs
-        ).limit(limit).all()
-        
-        return candidates
-    
-    def _score_candidates_ml(self, candidates: List[Song], taste_profile: Dict, user_ratings: List[Dict]) -> List[Tuple[Song, float, str]]:
-        """Score candidates using machine learning algorithms"""
-        if not candidates or not user_ratings:
-            return [(song, 50.0, "Popular choice") for song in candidates]
-        
-        scored_songs = []
-        preferred_ranges = taste_profile.get('preferred_ranges', {})
-        
-        # Create user preference vector from their ratings
-        user_features = []
-        for rating_data in user_ratings:
-            user_features.append([
-                rating_data['energy'],
-                rating_data['valence'], 
-                rating_data['danceability'],
-                rating_data['acousticness'],
-                rating_data['tempo'],
-                rating_data['instrumentalness']
+    def _calculate_cosine_profile(self, liked_songs: List[Dict]) -> np.array:
+        """Calculate average profile of liked songs"""
+        if not liked_songs:
+            return np.array([0.5] * 6)      
+        features = []
+        for song in liked_songs:
+            weight = song['rating'] / 5.0
+            features.append([
+                song['energy'] * weight,
+                song['valence'] * weight,
+                song['danceability'] * weight,
+                song['acousticness'] * weight,
+                song['tempo'] * weight,
+                song['instrumentalness'] * weight
             ])
         
-        # Calculate user's centroid (average preferences)
-        user_centroid = np.mean(user_features, axis=0) if user_features else np.array([0.5] * 6)
+        return np.mean(features, axis=0)
+    
+    def _get_unrated_songs(self, db: Session, user_id: str) -> List[Song]:
+        """Get songs user hasn't rated"""
+        rated_song_results = db.query(UserSongRating.song_id).filter(
+            UserSongRating.user_id == user_id
+        ).all()
+        
+        rated_song_ids = [r.song_id for r in rated_song_results]
+        
+        if rated_song_ids:
+            return db.query(Song).filter(not_(Song.id.in_(rated_song_ids))).limit(200).all()
+        else:
+            return db.query(Song).limit(200).all()
+    
+    def _score_songs(self, candidates: List[Song], user_profile: Dict) -> List[Tuple]:
+        """Score songs with proper weighted scoring"""
+        scored_songs = []
+        cosine_profile = user_profile['cosine_profile']
         
         for song in candidates:
-            # Create song feature vector
-            song_vector = np.array([
-                song.energy,
-                song.valence,
-                song.danceability, 
-                song.acousticness,
-                song.tempo / 200.0,  # Normalize tempo
-                song.instrumentalness
-            ])
+            song_features = [
+                song.energy, song.valence, song.danceability,
+                song.acousticness, song.tempo / 200.0, song.instrumentalness
+            ]
             
-            # Calculate cosine similarity
-            similarity = cosine_similarity([user_centroid], [song_vector])[0][0]
+            # Cosine similarity score
+            cosine_score = cosine_similarity([cosine_profile], [song_features])[0][0]
             
-            # Apply preference range scoring
-            range_score = self._calculate_range_score(song, preferred_ranges)
+            # Decision tree score
+            dt_score = 0.5
+            if user_profile['method'] == 'decision_tree' and self.decision_tree:
+                try:
+                    dt_prob = self.decision_tree.predict_proba([song_features])[0]
+                    dt_score = dt_prob[1] if len(dt_prob) > 1 else dt_prob[0]
+                except:
+                    dt_score = 0.5
             
-            # Combine scores with weights
-            final_score = (similarity * 0.6 + range_score * 0.4) * 100
+            # Popularity score (normalized to 0-1 range)
+            popularity_score = 0
+            if song.rating_count and song.average_rating:
+                popularity_score = min(1.0, song.average_rating / 5.0)  # Normalize to 0-1
             
-            # Add small popularity boost for well-rated songs
-            if song.rating_count > 0:
-                popularity_boost = min(5, song.average_rating)
-                final_score += popularity_boost
+            # PROPER WEIGHTED COMBINATION (adds up to 1.0)
+            if user_profile['method'] == 'decision_tree':
+                raw_score = (dt_score * 0.5) + (cosine_score * 0.3) + (popularity_score * 0.2)
+            else:
+                raw_score = (cosine_score * 0.7) + (popularity_score * 0.3)
             
-            # Generate intelligent reason
-            reason = self._generate_smart_reason(song, taste_profile, similarity)
+            # Amplify differences
+            final_score = raw_score ** 1.5
             
-            scored_songs.append((song, final_score, reason))
+            scored_songs.append((song, final_score))
         
-        # Sort by score
         scored_songs.sort(key=lambda x: x[1], reverse=True)
         return scored_songs
     
-    def _calculate_range_score(self, song: Song, preferred_ranges: Dict) -> float:
-        """Calculate how well song fits user's preferred ranges"""
-        if not preferred_ranges:
-            return 0.7  # Neutral score
-        
-        feature_scores = []
-        song_features = {
-            'energy': song.energy,
-            'valence': song.valence,
-            'danceability': song.danceability,
-            'acousticness': song.acousticness,
-            'tempo': song.tempo / 200.0,
-            'instrumentalness': song.instrumentalness
-        }
-        
-        for feature, value in song_features.items():
-            if feature in preferred_ranges:
-                min_pref, max_pref = preferred_ranges[feature]
-                
-                if min_pref <= value <= max_pref:
-                    feature_scores.append(1.0)  # Perfect match
-                else:
-                    # Calculate penalty based on distance from range
-                    if value < min_pref:
-                        distance = min_pref - value
-                    else:
-                        distance = value - max_pref
-                    
-                    # Exponential decay penalty
-                    penalty = np.exp(-distance * 3)
-                    feature_scores.append(penalty)
-        
-        return mean(feature_scores) if feature_scores else 0.7
-    
-    def _generate_smart_reason(self, song: Song, taste_profile: Dict, similarity: float) -> str:
-        """Generate intelligent reason based on AI profile and similarity"""
-        style_keywords = taste_profile.get('style_keywords', [])
-        
-        reasons = []
-        
-        # Feature-based reasons
-        if song.energy > 0.7 and 'high-energy' in style_keywords:
-            reasons.append("matches your high-energy preference")
-        elif song.energy < 0.3 and 'chill' in style_keywords:
-            reasons.append("fits your chill music taste")
-        
-        if song.valence > 0.7 and 'upbeat' in style_keywords:
-            reasons.append("upbeat vibe like your favorites")
-        elif song.valence < 0.3 and 'emotional' in style_keywords:
-            reasons.append("emotional depth you enjoy")
-        
-        if song.danceability > 0.7 and 'danceable' in style_keywords:
-            reasons.append("great danceability match")
-        
-        if song.acousticness > 0.5:
-            reasons.append("acoustic elements")
-        
-        # Similarity-based reasons
-        if similarity > 0.8:
-            reasons.append("very similar to your top songs")
-        elif similarity > 0.6:
-            reasons.append("similar to songs you love")
-        
-        if not reasons:
-            if similarity > 0.5:
-                reasons = ["good match for your taste"]
-            else:
-                reasons = ["might expand your musical horizons"]
-        
-        return f"Recommended for its {' and '.join(reasons[:2])}"
-    
-    def _apply_smart_filters(self, scored_songs: List[Tuple[Song, float, str]], limit: int) -> List[Tuple[Song, float, str]]:
-        """Apply diversity and quality filters"""
+    def _apply_diversity_filter(self, scored_songs: List[Tuple], limit: int) -> List[Tuple]:
+        """Apply diversity filter"""
         if len(scored_songs) <= limit:
             return scored_songs
         
-        filtered_songs = []
+        diverse_songs = []
         used_keys = set()
         used_tempos = set()
         
-        for song, score, reason in scored_songs:
-            # Diversity filters
-            tempo_range = int(song.tempo // 20) * 20  # Group by 20 BPM ranges
-            
-            # Skip if we already have too many songs in same key or tempo range
-            if len(filtered_songs) >= limit // 2:  # Apply diversity after getting half
-                if song.key in used_keys and len([s for s in filtered_songs if s[0].key == song.key]) >= 2:
+        for song, score in scored_songs:
+            # Apply diversity after getting half the songs
+            if len(diverse_songs) >= limit // 2:
+                tempo_bucket = int(song.tempo // 30) * 30
+                
+                # Skip if too many in same key or tempo range
+                if song.key in used_keys and len([s for s in diverse_songs if s[0].key == song.key]) >= 2:
                     continue
-                if tempo_range in used_tempos and len([s for s in filtered_songs if int(s[0].tempo // 20) * 20 == tempo_range]) >= 2:
+                if tempo_bucket in used_tempos and len([s for s in diverse_songs if int(s[0].tempo // 30) * 30 == tempo_bucket]) >= 2:
                     continue
             
-            filtered_songs.append((song, score, reason))
+            diverse_songs.append((song, score))
             used_keys.add(song.key)
-            used_tempos.add(tempo_range)
+            if len(diverse_songs) >= limit // 2:  # Only track tempos after half
+                used_tempos.add(int(song.tempo // 30) * 30)
             
-            if len(filtered_songs) >= limit:
-                break
-        
-        return filtered_songs
-    
-    def _format_recommendations(self, scored_songs: List[Tuple[Song, float, str]]) -> List[Dict]:
-        """Format recommendations for API response"""
-        recommendations = []
-        
-        for song, score, reason in scored_songs:
-            recommendations.append({
-                'index': song.index,
-                'id': song.id,
-                'title': song.title,
-                'danceability': song.danceability,
-                'energy': song.energy,
-                'key': song.key,
-                'loudness': song.loudness,
-                'mode': song.mode,
-                'acousticness': song.acousticness,
-                'instrumentalness': song.instrumentalness,
-                'liveness': song.liveness,
-                'valence': song.valence,
-                'tempo': song.tempo,
-                'duration_ms': song.duration_ms,
-                'time_signature': song.time_signature,
-                'num_bars': song.num_bars,
-                'num_sections': song.num_sections,
-                'num_segments': song.num_segments,
-                'class_label': song.class_label,
-                'average_rating': song.average_rating,
-                'rating_count': song.rating_count,
-                'created_at': song.created_at,
-                'updated_at': song.updated_at,
-                'match_score': min(99, max(60, int(score))),  # Clamp to 60-99 range
-                'reason': reason
-            })
-        
-        return recommendations
-    
-    def _get_smart_popular_songs(self, db: Session, limit: int) -> List[Dict]:
-        """Get diverse popular songs as fallback"""
-        popular_songs = db.query(Song).filter(
-            Song.rating_count > 0
-        ).order_by(
-            Song.average_rating.desc(),
-            Song.rating_count.desc()
-        ).limit(limit * 2).all()  # Get more to ensure diversity
-        
-        # Apply diversity to popular songs
-        diverse_songs = []
-        used_keys = set()
-        
-        for song in popular_songs:
             if len(diverse_songs) >= limit:
                 break
-                
-            # Ensure diversity in popular recommendations too
-            if len(diverse_songs) >= limit // 2 and song.key in used_keys:
-                continue
-                
-            diverse_songs.append(song)
-            used_keys.add(song.key)
         
+        return diverse_songs
+    
+    def _get_taste_description(self, user_ratings: List[Dict]) -> str:
+        """Generate cached taste description"""
+        liked_songs = [r for r in user_ratings if r['rating'] >= 4.0]
+        
+        if not liked_songs:
+            return "Still discovering your preferences"
+        
+        # Create cache key from liked songs
+        cache_key = hashlib.md5(
+            json.dumps([f"{s['song_id']}:{s['rating']}" for s in liked_songs], sort_keys=True).encode()
+        ).hexdigest()
+        
+        # Check cache first
+        if cache_key in self.taste_descriptions:
+            return self.taste_descriptions[cache_key]
+        
+        # Generate new description
+        if self.openai_available and self.client:
+            try:
+                top_songs = [s['title'] for s in liked_songs[:4]]
+                
+                prompt = f"""A user loves these songs: {', '.join(top_songs)}
+
+Write one natural sentence describing their music taste. Make it conversational and friendly. Start with "You" and keep it under 15 words.
+
+Examples:
+- "You love emotional indie rock with meaningful lyrics"
+- "You're into upbeat pop songs that make you dance"
+- "You prefer mellow acoustic tracks with soulful vocals"
+
+Don't mention specific songs."""
+
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "Describe music taste in a friendly, natural way."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=30,
+                    temperature=0.8
+                )
+                
+                description = response.choices[0].message.content.strip()
+                
+                # Cache the result
+                self.taste_descriptions[cache_key] = description
+                return description
+                
+            except Exception as e:
+                print(f"OpenAI failed: {e}")
+        
+        # Simple fallback
+        avg_energy = mean([s['energy'] for s in liked_songs])
+        avg_valence = mean([s['valence'] for s in liked_songs])
+        
+        if avg_energy > 0.6 and avg_valence > 0.6:
+            description = "You love energetic, upbeat music"
+        elif avg_energy < 0.4 and avg_valence < 0.4:
+            description = "You prefer mellow, emotional songs"
+        elif avg_energy > 0.6:
+            description = "You're drawn to high-energy music"
+        elif avg_valence > 0.6:
+            description = "You enjoy positive, uplifting songs"
+        else:
+            description = "You have diverse musical tastes"
+        
+        self.taste_descriptions[cache_key] = description
+        return description
+    
+    def _format_recommendations(self, scored_songs: List[Tuple]) -> List[Dict]:
+        """Format with better score distribution"""
         recommendations = []
-        for i, song in enumerate(diverse_songs[:limit]):
+        
+        # Calculate percentile-based scores for better distribution
+        scores = [score for _, score in scored_songs]
+        max_score = max(scores) if scores else 1.0
+        min_score = min(scores) if scores else 0.0
+        
+        for i, (song, score) in enumerate(scored_songs):
+            # BETTER SCORE DISTRIBUTION: Use percentile ranking
+            if max_score > min_score:
+                normalized_score = (score - min_score) / (max_score - min_score)
+                match_score = int(60 + (normalized_score * 35))  # 60-95 range
+            else:
+                match_score = 90 - (i * 3)  # Decreasing scores if all similar
+            
             recommendations.append({
                 'index': song.index,
                 'id': song.id,
@@ -517,15 +330,15 @@ Create a detailed music taste profile. Return ONLY valid JSON:
                 'num_sections': song.num_sections,
                 'num_segments': song.num_segments,
                 'class_label': song.class_label,
-                'average_rating': song.average_rating,
-                'rating_count': song.rating_count,
+                'average_rating': song.average_rating or 0.0,
+                'rating_count': song.rating_count or 0,
                 'created_at': song.created_at,
                 'updated_at': song.updated_at,
-                'match_score': 85 - (i * 2),  # Decreasing scores for popular songs
-                'reason': f"Popular {'and well-rated' if song.average_rating > 4 else ''} song"
+                'match_score': match_score,
+                'reason': 'Recommended for you'
             })
         
         return recommendations
-
+    
 # Global instance
-recommendation_engine = SmartRecommendationEngine()
+recommendation_engine = MLRecommendationEngine()
