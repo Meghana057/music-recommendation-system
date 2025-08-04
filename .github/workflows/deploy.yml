@@ -13,15 +13,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    # Backend Tests
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
     - name: Test Backend
       run: |
         cd backend
-        echo "Backend tests would run here"
+        pip install -r requirements.txt
+        pytest tests/ -v
     
-    - name: Test Frontend  
+    # Frontend Tests  
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Test Frontend
       run: |
         cd frontend
-        echo "Frontend tests would run here"
+        npm install
+        npm test -- --watchAll=false
 
   deploy:
     needs: test
