@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app import models, schemas
 from typing import List, Optional, Tuple
+from sqlalchemy import func, or_
 import math
 
 
@@ -21,9 +22,13 @@ def get_song_by_id(db: Session, song_id: str) -> Optional[models.Song]:
 
 
 def get_song_by_title(db: Session, title: str) -> Optional[models.Song]:
-    """Get a song by its title (case-insensitive)"""
+    """Get a song by its title with simple fuzzy matching"""
     return db.query(models.Song).filter(
-        func.lower(models.Song.title) == func.lower(title)
+        or_(
+            func.lower(models.Song.title) == func.lower(title),  # Exact match first
+            models.Song.title.ilike(f"{title}%"),               # Starts with
+            models.Song.title.ilike(f"%{title}%")               # Contains
+        )
     ).first()
 
 

@@ -18,13 +18,11 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  Divider,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Clear as ClearIcon,
   MusicNote as MusicNoteIcon,
-  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import { useSearch } from '../hooks/useSearch';
 import { ApiService } from '../services/api';
@@ -39,7 +37,7 @@ interface SearchBarProps {
 
 const SearchBar: React.FC<SearchBarProps> = ({
   onSongFound,
-  placeholder = "Search for songs... (e.g., '21 guns', 'beautiful', 'cold')",
+  placeholder = "Search for songs... (e.g., '21 guns', 'afterlif', 'beautiful')",
   onRatingUpdate
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -47,68 +45,28 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false);
 
-  
   const { searchResult, searching, searchError, searchSong, clearSearch, updateSearchResult } = useSearch();
-  const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Common song suggestions for autocomplete (from your playlist data)
-  const commonSongs = [
-    "3AM", "4 Walls", "11:11", "21 Guns", "21", "24/7", "24K Magic",
-    "All Mine", "All Night", "American Idiot", "Bad Romance", "Beautiful Day",
-    "Believer", "Blank Space", "Call Me Baby", "Castle on the Hill", 
-    "Chasing Cars", "Closer", "Cold", "Beautiful Girls", "Bleeding Love",
-    "BOOMBAYAH", "Breakeven", "Breathe Again", "Burning Up (Fire)",
-    "Can't Fight The Moonlight", "Car Radio", "Celebration Song"
-  ];
-
-  // Get search suggestions based on input
-  const getSearchSuggestions = (input: string): string[] => {
-    if (!input.trim()) return [];
-    return commonSongs
-      .filter(song => song.toLowerCase().includes(input.toLowerCase()))
-      .slice(0, 5);
-  };
-
-  // Smart search with multiple strategies using your ApiService
-  const smartSearch = async (query: string): Promise<Song[]> => {
+  // Simple search - just call the API once
+  const fetchSuggestions = async (query: string): Promise<Song[]> => {
     if (!query.trim()) return [];
 
-    const strategies = [
-      query,                          // Exact: "21 guns"
-      query.replace(/\s+/g, ''),     // No spaces: "21guns"  
-      query.split(' ')[0],           // First word: "21"
-      query.split(' ').pop() || '',  // Last word: "guns"
-      query.toLowerCase(),           // Lowercase: "21 guns"
-      query.charAt(0).toUpperCase() + query.slice(1).toLowerCase(), // Title case
-      ...query.split(' ').filter(word => word.length > 2), // Individual words > 2 chars
-    ];
-
-    const allResults: Song[] = [];
-    
-    for (const searchTerm of strategies) {
-      if (!searchTerm || searchTerm.length < 1) continue;
+    try {
+      const result = await ApiService.searchSong(query);
       
-      try {
-        const result = await ApiService.searchSong(searchTerm);
-        if (result.found && result.song) {
-          allResults.push(result.song);
-        }
-      } catch (e) {
-        // Continue with next strategy if this one fails
-        continue;
+      // Backend returns single song, wrap in array for dropdown
+      if (result && result.found && result.song) {
+        return [result.song];
       }
+      
+      return [];
+    } catch (error) {
+      return [];
     }
-
-    // Remove duplicates based on song ID
-    const uniqueResults = allResults.filter((song, index, arr) => 
-      arr.findIndex(s => s.id === song.id) === index
-    );
-
-    return uniqueResults;
   };
 
-  // Live search for suggestions (debounced)
+  // Live search for suggestions - NO debouncing, NO minimum characters
   useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchSuggestions([]);
@@ -122,26 +80,26 @@ const SearchBar: React.FC<SearchBarProps> = ({
       return;
     }
 
-    const delayedSearch = setTimeout(async () => {
+    const searchForSuggestions = async () => {
       setIsLoadingSuggestions(true);
       
-      // Only show suggestions if input is focused and no search result matches
-      if (document.activeElement === inputRef.current && (!searchResult || searchResult.title !== searchTerm.trim())) {
+      // Only show suggestions if input is focused
+      if (document.activeElement === inputRef.current) {
         setShowSuggestions(true);
       }
       
       try {
-        const results = await smartSearch(searchTerm);
-        setSearchSuggestions(results.slice(0, 5)); // Show max 5 suggestions
+        const results = await fetchSuggestions(searchTerm);
+        setSearchSuggestions(results);
       } catch (error) {
         console.error('Suggestion search error:', error);
         setSearchSuggestions([]);
       } finally {
         setIsLoadingSuggestions(false);
       }
-    }, 300); // Wait 300ms after user stops typing
+    };
 
-    return () => clearTimeout(delayedSearch);
+    searchForSuggestions();
   }, [searchTerm, searchResult]);
 
   // Handle main search (Get Song button)
@@ -157,26 +115,20 @@ const SearchBar: React.FC<SearchBarProps> = ({
   }, [searchTerm, searchSong, searchResult, onSongFound]);
 
   // Handle suggestion click
-  const handleSuggestionClick = useCallback(async (suggestion: Song | string) => {
-    const title = typeof suggestion === 'string' ? suggestion : suggestion.title;
-    
-    // Immediately close dropdown and clear suggestions
+  const handleSuggestionClick = useCallback(async (suggestion: Song) => {
     setShowSuggestions(false);
     setSearchSuggestions([]);
-    setSearchTerm(title);
+    setSearchTerm(suggestion.title);
     
-    // Perform the search
-    await searchSong(title);
+    await searchSong(suggestion.title);
     
-    // If it's a song object and we have onSongFound callback
-    if (typeof suggestion === 'object' && onSongFound) {
+    if (onSongFound) {
       onSongFound(suggestion);
     }
   }, [searchSong, onSongFound]);
 
   const handleInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setSearchTerm(value);
+    setSearchTerm(event.target.value);
   }, []);
 
   const handleKeyPress = useCallback((event: React.KeyboardEvent) => {
@@ -193,13 +145,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
   }, [handleSearch, searchSuggestions, showSuggestions, handleSuggestionClick]);
 
   const handleInputFocus = useCallback(() => {
-    // Only show suggestions if there's no current search result matching the input
     if (searchTerm.trim() && (!searchResult || searchResult.title !== searchTerm.trim())) {
       setShowSuggestions(true);
     }
   }, [searchTerm, searchResult]);
 
-  // Updated handleClear to clear both search term AND search results
   const handleClear = useCallback(() => {
     setSearchTerm('');
     setShowSuggestions(false);
@@ -207,37 +157,28 @@ const SearchBar: React.FC<SearchBarProps> = ({
     clearSearch();
   }, [clearSearch]);
 
-  const handleRatingChange = useCallback((newRating: number) => {
-    // This is handled by the StarRating component with optimistic updates
-  }, []);
-
   const handleRatingSuccess = useCallback((songId: string, newUserRating: number, newAverage: number, newCount: number) => {
-    // Update the search result optimistically
     updateSearchResult(songId, newUserRating, newAverage, newCount);
     
-    // Also update global state (table + analytics)
     if (onRatingUpdate) {
       onRatingUpdate(songId, newUserRating, newAverage, newCount);
     }
   }, [updateSearchResult, onRatingUpdate]);
 
-  // Format duration helper
   const formatDuration = (durationMs: number): string => {
     const minutes = Math.floor(durationMs / 60000);
     const seconds = Math.floor((durationMs % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const textSuggestions = getSearchSuggestions(searchTerm);
   const hasResults = searchSuggestions.length > 0;
-  const hasSuggestions = textSuggestions.length > 0;
-  const shouldShowSuggestions = showSuggestions && (hasResults || hasSuggestions || isLoadingSuggestions);
+  const shouldShowSuggestions = showSuggestions && (hasResults || isLoadingSuggestions);
 
   return (
     <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto' }}>
       {/* Search Input */}
       <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-        <Box display="flex" gap={1} alignItems="center" ref={searchRef}>
+        <Box display="flex" gap={1} alignItems="center">
           <TextField
             fullWidth
             variant="outlined"
@@ -331,40 +272,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
                         />
                       </MenuItem>
                     ))}
-                    {(hasSuggestions) && <Divider />}
-                  </>
-                )}
-
-                {/* Text Suggestions */}
-                {hasSuggestions && !isLoadingSuggestions && (
-                  <>
-                    <MenuItem disabled>
-                      <ListItemText 
-                        primary="Suggestions" 
-                        primaryTypographyProps={{ variant: 'caption', fontWeight: 'bold' }}
-                      />
-                    </MenuItem>
-                    {textSuggestions.map((suggestion) => (
-                      <MenuItem
-                        key={suggestion}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        sx={{ pl: 3 }}
-                      >
-                        <ListItemIcon>
-                          <TrendingUpIcon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText primary={suggestion} />
-                      </MenuItem>
-                    ))}
                   </>
                 )}
 
                 {/* No Results */}
-                {!hasResults && !hasSuggestions && !isLoadingSuggestions && searchTerm.trim() && (
+                {!hasResults && !isLoadingSuggestions && searchTerm.trim() && (
                   <MenuItem disabled>
                     <ListItemText 
                       primary={`No songs found for "${searchTerm}"`}
-                      secondary="Try searching for '21 guns', 'beautiful', or 'american'"
+                      secondary="Try '3AM', 'beautiful', or 'afterlif'"
                     />
                   </MenuItem>
                 )}
@@ -436,7 +352,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                     currentRating={searchResult.user_rating || 0}
                     averageRating={searchResult.average_rating}
                     ratingCount={searchResult.rating_count}
-                    onRatingChange={handleRatingChange}
+                    onRatingChange={() => {}}
                     onRatingSuccess={handleRatingSuccess}
                     readOnly={false}
                     size="medium"
@@ -472,14 +388,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
       {!searchResult && !searchError && !searching && (
         <Paper elevation={1} sx={{ p: 2, backgroundColor: 'background.default' }}>
           <Typography variant="body2" color="text.secondary" gutterBottom>
-            <strong>Enhanced Search Tips:</strong>
+            <strong>Enhanced Search:</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            • Start typing to see live suggestions (e.g., "gun" → finds "21 Guns")
+            • Partial matches work: "afterlif" finds "Afterlife"
             <br />
-            • Use partial matches like "beautiful", "american", or "cold"
+            • Try "3AM", "beautiful", "american", or any song title
             <br />
-            • Click suggestions or press Enter to search
+            • Start typing to see live suggestions
           </Typography>
         </Paper>
       )}
