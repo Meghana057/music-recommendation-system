@@ -31,7 +31,6 @@ const MusicRecommendations: React.FC = () => {
   const [recommendations, setRecommendations] = useState<SongRecommendation[]>([]);
   const [tasteProfile, setTasteProfile] = useState<string>(''); // Added for taste profile
   const [error, setError] = useState<string>('');
-  const [message, setMessage] = useState<string>('');
   const { user, loading: authLoading } = useAuth();
 
   const fetchRecommendations = useCallback(async () => {
@@ -50,7 +49,7 @@ const MusicRecommendations: React.FC = () => {
       
       setRecommendations(response.recommendations);
       setTasteProfile(response.taste_profile || ''); // Capture taste profile
-      setMessage(response.message);
+
       
       // Set final state based on results
       if (response.recommendations.length > 0) {
