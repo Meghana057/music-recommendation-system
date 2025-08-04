@@ -21,7 +21,7 @@ app = FastAPI(
 # CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000","https://music-recommendation-system-six.vercel.app"],  # React dev server
     allow_credentials=True, #Allow cookies, session tokens, or Authorization headers to be sent with requests.needed Supabase auth (JWT or cookies)
     allow_methods=["*"],
     allow_headers=["*"],  # Important for Authorization header
