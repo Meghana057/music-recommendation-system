@@ -1,3 +1,6 @@
+ dev
+# Test change
+
 # Music Recommendation System
 
 Full-stack music recommendation application with React TypeScript frontend and FastAPI Python backend.
@@ -167,3 +170,4 @@ REACT_APP_SUPABASE_ANON_KEY=your_anon_key
 **Authentication not working:**
 - Verify all Supabase credentials match between frontend and backend
 - Check SUPABASE_JWT_SECRET is correct
+
