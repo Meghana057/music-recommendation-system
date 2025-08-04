@@ -20,6 +20,12 @@ jobs:
         python-version: '3.9'
     
     - name: Test Backend
+      env:
+        DATABASE_URL: sqlite:///test.db #Fake env 
+        SUPABASE_URL: https://test.supabase.co
+        SUPABASE_ANON_KEY: test-key
+        SUPABASE_JWT_SECRET: test-secret
+        OPENAI_API_KEY: test-key
       run: |
         cd backend
         pip install -r requirements.txt
